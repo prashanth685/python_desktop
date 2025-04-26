@@ -11,7 +11,7 @@ import os
 
 # Assuming Database class is defined elsewhere
 from database import Database
-
+from project_selection import ProjectSelectionWindow  # Import the updated ProjectSelectionWindow
 
 class AuthWindow(QWidget):
     def __init__(self):
@@ -19,8 +19,9 @@ class AuthWindow(QWidget):
         self.client = None
         self.db = None
         self.users_collection = None
-        self.initUI()
         self.initDB()
+        self.initUI()
+        self.setWindowState(Qt.WindowMinimized)  # Set maximized state after UI setup
 
     def initDB(self):
         try:
@@ -35,11 +36,7 @@ class AuthWindow(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Sarayu Infotech Solutions Pvt. Ltd.')
-        # self.setGeometry(200, 200, 1800, 1600)
-        self.showFullScreen()  # Fullscreen mode
-        # self.showMaximized()
-
-
+        
         main_layout = QVBoxLayout()
         main_layout.setAlignment(Qt.AlignCenter)
         self.setLayout(main_layout)
@@ -134,7 +131,6 @@ class AuthWindow(QWidget):
         login_logo_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(login_logo_label)
 
-
         email_label = QLabel('Email')
         email_label.setStyleSheet("font-size: 18px; color: #333;font:bold")
         self.login_email_input = self.create_input_field('Enter your email')
@@ -157,7 +153,7 @@ class AuthWindow(QWidget):
                 color: white;
                 border-radius: 5px;
                 padding: 15px;
-                width: 250px;
+                width: 100px;
                 font-size: 18px;
             }
             QPushButton:hover {
@@ -180,9 +176,6 @@ class AuthWindow(QWidget):
         layout.setSpacing(15)
 
         signup_logo_label = QLabel(self)
-        # logo_path = "logo.png" if os.path.exists("logo.png") else "icons/placeholder.png"
-        # pixmap = QPixmap(logo_path)
-        # signup_logo_label.setPixmap(pixmap.scaled(100, 100, Qt.KeepAspectRatio))
         signup_logo_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(signup_logo_label)
 
@@ -190,14 +183,12 @@ class AuthWindow(QWidget):
         email_label.setStyleSheet("font-size: 18px; color: #333;font:bold")
         self.signup_email_input = self.create_input_field('Enter your email')
         self.signup_email_input.setStyleSheet("font-size: 16px; color: #333;border:2px solid black")
-
         layout.addRow(email_label, self.signup_email_input)
 
         password_label = QLabel('Password')
         password_label.setStyleSheet("font-size: 18px; color: #333;font:bold")
         self.signup_password_input = self.create_input_field('Enter your password')
         self.signup_password_input.setStyleSheet("font-size: 16px; color: #333;border:2px solid black")
-
         self.signup_password_input.setEchoMode(QLineEdit.Password)
         layout.addRow(password_label, self.signup_password_input)
 
@@ -239,14 +230,13 @@ class AuthWindow(QWidget):
 
         if user and bcrypt.checkpw(password.encode('utf-8'), user["password"]):
             try:
-                from dashboard import DashboardWindow
                 db = Database(connection_string="mongodb://localhost:27017/", email=email)
-                self.dashboard = DashboardWindow(db, email)
-                self.dashboard.show()
-                self.close()
+                self.project_selection = ProjectSelectionWindow(db, email, self)
+                self.project_selection.show()
+                self.hide()  # Hide AuthWindow instead of closing to keep it in memory
             except Exception as e:
-                print(f"Error opening Dashboard: {e}")
-                QMessageBox.critical(self, "Error", f"Failed to open dashboard: {e}")
+                print(f"Error opening Project Selection: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to open project selection: {e}")
         else:
             QMessageBox.warning(self, "Login Failed", "Incorrect email or password.")
 

@@ -113,7 +113,7 @@ class TimeViewFeature:
         layout = QVBoxLayout()
         self.widget.setLayout(layout)
 
-        header = QLabel(f"TIME VIEW FOR {self.project_name.upper()}")
+        header = QLabel(f"TIME VIEW FOR {self.project_name.upper()}\n FRAME INDEX {self.frame_index}")
         header.setStyleSheet("color: white; font-size: 26px; font-weight: bold; padding: 8px;")
         layout.addWidget(header, alignment=Qt.AlignCenter)
 
@@ -176,8 +176,9 @@ class TimeViewFeature:
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.time_widget)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("background-color: #2c3e50; border: none;")
-        scroll_area.setMinimumHeight(400)
+        scroll_area.setStyleSheet("background-color: black; border: none;color:black")
+        # scroll_area.setMinimumHeight(1000)
+        scroll_area.setMaximumHeight(4000)
         layout.addWidget(scroll_area)
 
         if tags_data:
@@ -189,8 +190,8 @@ class TimeViewFeature:
         self.filename_combo.clear()
         for filename in sorted(filenames):
             self.filename_combo.addItem(filename)
-        self.filename_combo.addItem(f"data{self.filename_counter} (Next)")
-        self.filename_combo.setCurrentText(f"data{self.filename_counter} (Next)")
+        self.filename_combo.addItem(f"data {self.filename_counter}")
+        self.filename_combo.setCurrentText(f"data {self.filename_counter}")
 
     def open_data_table(self, selected_filename):
         if "(Next)" in selected_filename:
@@ -441,7 +442,7 @@ class TimeViewFeature:
                             fraction = pos / self.window_size
                             tick_time = start_time + timedelta(seconds=fraction * self.window_size)
                             milliseconds = tick_time.microsecond // 1000
-                            time_labels.append(f"{tick_time.strftime('%H:%M:%S')}.{milliseconds:03d}\n{tick_time.strftime('%d %m %Y')}")
+                            time_labels.append(f"{tick_time.strftime('%H:%M:%S')}.{milliseconds:03d}\n{tick_time.strftime('%d-%m-%Y')}")
                         ax.set_xticks(tick_positions)
                         ax.set_xticklabels(time_labels, rotation=0, ha='left', fontsize=10)
                 except Exception as e:

@@ -7,23 +7,53 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 
 class Database:
     def __init__(self, connection_string="mongodb://localhost:27017/", email="user@example.com"):
+        self.connection_string = connection_string
+        self.email = email
+        self.email_safe = email.replace('@', '_').replace('.', '_')
+        self.client = None
+        self.db = None
+        self.user_collection = None
+        self.tags_collection = None
+        self.messages_collection = None
+        self.timeview_collection = None
+        self.projects = []
+        self.connect()
+
+    def connect(self):
+        """Establish MongoDB connection and initialize collections."""
         try:
-            self.client = MongoClient(connection_string)
+            self.client = MongoClient(self.connection_string)
             self.client.server_info()  # Test connection
             self.db = self.client["sarayu_db"]
-            self.email = email
-            self.email_safe = email.replace('@', '_').replace('.', '_')
             self.user_collection = self.db[f"user_{self.email_safe}"]
             self.tags_collection = self.db[f"tagcreated_{self.email_safe}"]
             self.messages_collection = self.db[f"mqttmessage_{self.email_safe}"]
-            # New collection for timeview feature
             self.timeview_collection = self.db[f"timeview_messages_{self.email_safe}"]
-            self.projects = []
-            # Create indexes for timeview collection
             self._create_timeview_indexes()
-            logging.info(f"Database initialized for {email}")
+            logging.info(f"Database initialized for {self.email}")
         except Exception as e:
             logging.error(f"Failed to connect to MongoDB: {str(e)}")
+            raise
+
+    def is_connected(self):
+        """Check if MongoDB connection is active."""
+        if self.client is None:
+            return False
+        try:
+            self.client.admin.command('ping')
+            return True
+        except Exception:
+            return False
+
+    def reconnect(self):
+        """Re-establish MongoDB connection if disconnected."""
+        try:
+            if self.client is not None:
+                self.client.close()
+            self.connect()
+            logging.info("Reconnected to MongoDB")
+        except Exception as e:
+            logging.error(f"Failed to reconnect to MongoDB: {str(e)}")
             raise
 
     def _create_timeview_indexes(self):
@@ -38,11 +68,22 @@ class Database:
             logging.error(f"Failed to create indexes for timeview_messages: {str(e)}")
 
     def close_connection(self):
+        """Close MongoDB connection."""
         if self.client:
-            self.client.close()
-            logging.info("MongoDB connection closed.")
+            try:
+                self.client.close()
+                self.client = None
+                self.db = None
+                self.user_collection = None
+                self.tags_collection = None
+                self.messages_collection = None
+                self.timeview_collection = None
+                logging.info("MongoDB connection closed.")
+            except Exception as e:
+                logging.error(f"Error closing MongoDB connection: {str(e)}")
 
     def load_projects(self):
+        """Load project names for the user."""
         self.projects.clear()
         try:
             for project in self.user_collection.find():
@@ -56,6 +97,7 @@ class Database:
             return []
 
     def create_project(self, project_name):
+        """Create a new project."""
         if not project_name:
             return False, "Project name cannot be empty!"
         if self.user_collection.find_one({"project_name": project_name}):
@@ -76,6 +118,7 @@ class Database:
             return False, f"Failed to create project: {str(e)}"
 
     def edit_project(self, old_project_name, new_project_name):
+        """Rename a project and update related collections."""
         if new_project_name == old_project_name:
             return True, "No change made."
         if self.user_collection.find_one({"project_name": new_project_name}):
@@ -106,6 +149,7 @@ class Database:
             return False, f"Failed to edit project: {str(e)}"
 
     def delete_project(self, project_name):
+        """Delete a project and its associated data."""
         try:
             self.user_collection.delete_one({"project_name": project_name})
             self.tags_collection.delete_many({"project_name": project_name})
@@ -120,6 +164,7 @@ class Database:
             return False, f"Failed to delete project: {str(e)}"
 
     def get_project_data(self, project_name):
+        """Retrieve data for a specific project."""
         try:
             data = self.user_collection.find_one({"project_name": project_name})
             logging.debug(f"Project data for {project_name}: {data}")
@@ -129,12 +174,14 @@ class Database:
             return None
 
     def parse_tag_string(self, tag_string):
+        """Parse a tag string into a dictionary."""
         if not tag_string:
             logging.error("Tag cannot be empty!")
             return None
         return {"tag_name": tag_string}
 
     def add_tag(self, project_name, tag_data):
+        """Add a tag to a project."""
         if not self.get_project_data(project_name):
             return False, "Project not found!"
         if self.tags_collection.find_one({"project_name": project_name, "tag_name": tag_data["tag_name"]}):
@@ -151,6 +198,7 @@ class Database:
             return False, f"Failed to add tag: {str(e)}"
 
     def edit_tag(self, project_name, row, new_tag_data):
+        """Edit an existing tag."""
         tags = list(self.tags_collection.find({"project_name": project_name}))
         if row >= len(tags):
             return False, "Invalid tag index!"
@@ -184,6 +232,7 @@ class Database:
             return False, f"Failed to edit tag: {str(e)}"
 
     def delete_tag(self, project_name, row):
+        """Delete a tag from a project."""
         tags = list(self.tags_collection.find({"project_name": project_name}))
         if row >= len(tags):
             return False, "Invalid tag index!"
@@ -204,7 +253,6 @@ class Database:
         """
         Disabled saving to messages_collection to prevent automatic storage of MQTT data.
         Data is only saved to timeview_collection when user initiates saving in TimeViewFeature.
-        This method can be used for validation or logging if needed.
         """
         if not self.get_project_data(project_name):
             logging.error(f"Project {project_name} not found!")
@@ -215,12 +263,12 @@ class Database:
             logging.error(f"Tag {tag_name} not found for project {project_name}!")
             return False, "Tag not found!"
         
-        # Log receipt of data without saving to messages_collection
         timestamp_str = timestamp if timestamp else datetime.datetime.now().isoformat()
         logging.debug(f"Received {len(values)} values for {tag_name} in {project_name} at {timestamp_str}")
         return True, "Tag values received but not saved to mqttmessage collection."
 
     def get_tag_values(self, project_name, tag_name):
+        """Retrieve tag values for a project."""
         try:
             messages = list(self.messages_collection.find(
                 {"project_name": project_name, "tag_name": tag_name}
@@ -242,6 +290,7 @@ class Database:
             return []
 
     def save_tag_values(self, project_name, tag_name, data):
+        """Save tag values to messages_collection."""
         if not self.get_project_data(project_name):
             logging.error(f"Project {project_name} not found!")
             return False, "Project not found!"
@@ -268,35 +317,24 @@ class Database:
             return False, f"Failed to save tag values: {str(e)}"
 
     def save_timeview_message(self, project_name, message_data):
-        """
-        Save a message for the timeview feature based on the Mongoose schema.
-        """
+        """Save a message for the timeview feature."""
         if not self.get_project_data(project_name):
             logging.error(f"Project {project_name} not found!")
             return False, "Project not found!"
         
-        # Validate required fields
         required_fields = ["topic", "filename", "frameIndex", "message"]
         for field in required_fields:
             if field not in message_data:
                 logging.error(f"Missing required field {field} in timeview message")
                 return False, f"Missing required field: {field}"
         
-        # Set default values for optional fields
         message_data.setdefault("numberOfChannels", None)
         message_data.setdefault("samplingRate", None)
         message_data.setdefault("samplingSize", None)
         message_data.setdefault("messageFrequency", None)
-        # message_data.setdefault("slot1", "N/A")
-        # message_data.setdefault("slot2", "N/A")
-        # message_data.setdefault("slot3", "N/A")
-        # message_data.setdefault("slot4", "N/A")
         
-        # Add project_name and timestamps
         message_data["project_name"] = project_name
         message_data["_id"] = ObjectId()
-        # message_data["createdAt"] = datetime.datetime.now().isoformat()
-        # message_data["updatedAt"] = message_data["createdAt"]
         
         try:
             result = self.timeview_collection.insert_one(message_data)
@@ -307,9 +345,7 @@ class Database:
             return False, f"Failed to save timeview message: {str(e)}"
 
     def get_timeview_messages(self, project_name, topic=None, filename=None):
-        """
-        Retrieve timeview messages, optionally filtered by topic and/or filename.
-        """
+        """Retrieve timeview messages, optionally filtered by topic and/or filename."""
         if not self.get_project_data(project_name):
             logging.error(f"Project {project_name} not found!")
             return []
