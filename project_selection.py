@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-                             QComboBox, QMessageBox, QApplication)
+                             QComboBox, QMessageBox, QApplication, QInputDialog)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 import os
@@ -22,7 +22,7 @@ class ProjectSelectionWindow(QWidget):
 
     def initUI(self):
         self.setWindowTitle('Project Selection - Sarayu Infotech Solutions')
-        self.showMinimized()
+        self.showMaximized()
         self.setStyleSheet("background-color: #f0f0f0;")
 
         main_layout = QVBoxLayout()
@@ -61,6 +61,23 @@ class ProjectSelectionWindow(QWidget):
 
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
+
+        create_button = QPushButton('Create Project')
+        create_button.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                border-radius: 5px;
+                padding: 10px;
+                font-size: 25px;
+                min-width: 150px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
+        create_button.clicked.connect(self.create_project)
+        button_layout.addWidget(create_button)
 
         open_button = QPushButton('Open Project')
         open_button.setStyleSheet("""
@@ -115,25 +132,43 @@ class ProjectSelectionWindow(QWidget):
             logging.error(f"Error loading projects: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to load projects: {str(e)}")
             QMessageBox.setStyleSheet("""
-    QMessageBox {
-        background-color: #ffdddd;
-        font: bold 12pt 'Arial';
-    }
-    QLabel {
-        color: #aa0000;
-    }
-    QPushButton {
-        background-color: #aa0000;
-        color: white;
-        border: none;
-        padding: 6px 12px;
-        min-width: 80px;
-    }
-    QPushButton:hover {
-        background-color: #cc0000;
-    }
-""")
+                QMessageBox {
+                    background-color: #ffdddd;
+                    font: bold 12pt 'Arial';
+                }
+                QLabel {
+                    color: #aa0000;
+                }
+                QPushButton {
+                    background-color: #aa0000;
+                    color: white;
+                    border: none;
+                    padding: 6px 12px;
+                    min-width: 80px;
+                }
+                QPushButton:hover {
+                    background-color: #cc0000;
+                }
+            """)
 
+    def create_project(self):
+        """Create a new project."""
+        try:
+            project_name, ok = QInputDialog.getText(self, "Create Project", "Enter project name:")
+            if ok and project_name:
+                # Call the Database class's create_project method
+                success, message = self.db.create_project(project_name)
+                if success:
+                    self.load_projects()  # Refresh project list
+                    QMessageBox.information(self, "Success", message)
+                    logging.info(f"Created new project: {project_name}")
+                    # Automatically select the new project
+                    self.project_combo.setCurrentText(project_name)
+                else:
+                    QMessageBox.warning(self, "Error", message)
+        except Exception as e:
+            logging.error(f"Error creating project: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to create project: {str(e)}")
 
     def open_project(self):
         """Open the selected project in a new DashboardWindow."""
@@ -160,7 +195,6 @@ class ProjectSelectionWindow(QWidget):
         except Exception as e:
             logging.error(f"Error opening Dashboard for project {project_name}: {str(e)}")
             QMessageBox.critical(self, "Error", f"Failed to open dashboard: {str(e)}")
-
 
     def back_to_login(self):
         """Return to the login window."""

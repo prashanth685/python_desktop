@@ -176,17 +176,17 @@ class DashboardWindow(QWidget):
                 action.setToolTip(tooltip)
             self.toolbar.addAction(action)
 
-        add_action("New", "icons/new.png", self.create_project, "Create a New Project")
-        add_action("", "icons/save.png", self.save_action, "Save Project")
-        add_action("", "icons/refresh.png", self.refresh_action, "Refresh View")
-        add_action("", "icons/edit.png", self.edit_project_dialog, "Edit Project Name")
+        add_action("New", "icons/new.ico", self.create_project, "Create a New Project")
+        add_action("", "icons/save.ico", self.save_action, "Save Project")
+        add_action("", "icons/refresh.ico", self.refresh_action, "Refresh View")
+        add_action("", "icons/edit.ico", self.edit_project_dialog, "Edit Project Name")
 
-        self.play_action = QAction(QIcon("icons/record.png"), "", self)
+        self.play_action = QAction(QIcon("icons/record.ico"), "", self)
         self.play_action.triggered.connect(self.start_saving)
         self.play_action.setToolTip("Start Saving Data (Time View)")
         self.toolbar.addAction(self.play_action)
 
-        self.pause_action = QAction(QIcon("icons/pause.png"), "", self)
+        self.pause_action = QAction(QIcon("icons/pause.ico"), "", self)
         self.pause_action.triggered.connect(self.stop_saving)
         self.pause_action.setToolTip("Stop Saving Data (Time View)")
         self.toolbar.addAction(self.pause_action)
@@ -198,7 +198,7 @@ class DashboardWindow(QWidget):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
-        add_action("Settings", "icons/settings.png", self.settings_action, "Settings")
+        add_action("Settings", "icons/settings.ico", self.settings_action, "Settings")
 
     def load_project_features(self):
         """Load features for the current project into the tree."""
@@ -225,22 +225,22 @@ class DashboardWindow(QWidget):
         """Add the current project and its features to the tree widget."""
         project_item = QTreeWidgetItem(self.tree)
         project_item.setText(0, project_name)
-        project_item.setIcon(0, QIcon("icons/folder.png") if os.path.exists("icons/folder.png") else QIcon())
+        project_item.setIcon(0, QIcon("icons/folder.ico") if os.path.exists("icons/folder.ico") else QIcon())
         project_item.setData(0, Qt.UserRole, {"type": "project", "name": project_name})
 
         features = [
-            ("Create Tags", "icons/tag.png"),
-            ("Time View", "icons/time.png"),
-            ("Tabular View", "icons/table.png"),
-            ("FFT", "icons/fft.png"),
-            ("Waterfall", "icons/waterfall.png"),
-            ("Orbit", "icons/orbit.png"),
-            ("Trend View", "icons/trend.png"),
-            ("Multiple Trend View", "icons/multitrend.png"),
-            ("Bode Plot", "icons/bode.png"),
-            ("History Plot", "icons/history.png"),
-            ("Time Report", "icons/report.png"),
-            ("Report", "icons/report.png")
+            ("Create Tags", "icons/tag.ico"),
+            ("Time View", "icons/time.ico"),
+            ("Tabular View", "icons/table.ico"),
+            ("FFT", "icons/fft.ico"),
+            ("Waterfall", "icons/waterfall.ico"),
+            ("Orbit", "icons/orbit.ico"),
+            ("Trend View", "icons/trend.ico"),
+            ("Multiple Trend View", "icons/multitrend.ico"),
+            ("Bode Plot", "icons/bode.ico"),
+            ("History Plot", "icons/history.ico"),
+            ("Time Report", "icons/report.ico"),
+            ("Report", "icons/report.ico")
         ]
 
         for feature, icon_path in features:

@@ -21,7 +21,7 @@ class AuthWindow(QWidget):
         self.users_collection = None
         self.initDB()
         self.initUI()
-        self.setWindowState(Qt.WindowMinimized)  # Set maximized state after UI setup
+        self.setWindowState(Qt.WindowMaximized)  # Set maximized state after UI setup
 
     def initDB(self):
         try:

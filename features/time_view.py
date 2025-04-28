@@ -8,82 +8,6 @@ from datetime import datetime, timedelta
 from collections import deque
 import logging
 
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-
-class DataTableDialog(QDialog):
-    def __init__(self, db, project_name, filename, parent=None, on_delete_callback=None):
-        super().__init__(parent)
-        self.db = db
-        self.project_name = project_name
-        self.filename = filename
-        self.on_delete_callback = on_delete_callback
-        self.setWindowTitle(f"Data Details for {filename}")
-        self.setStyleSheet("background-color: #2c3e50; color: white;")
-        self.initUI()
-
-    def initUI(self):
-        layout = QVBoxLayout()
-        self.setLayout(layout)
-
-        self.table = QTableWidget()
-        self.table.setStyleSheet("background-color: #34495e; color: white; border: 1px solid #1a73e8;")
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["Frame Index", "No. of Channels", "Sampling Rate", "Sampling Size", "Updated Time"])
-        self.table.horizontalHeader().setStyleSheet("color: black; font-weight: bold;")
-        self.table.setSelectionMode(QTableWidget.NoSelection)
-        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
-        
-        self.populate_table()
-        layout.addWidget(self.table)
-
-        button_layout = QHBoxLayout()
-        delete_button = QPushButton("Delete")
-        delete_button.setStyleSheet("background-color: #e63946; color: white; padding: 5px; border-radius: 3px;")
-        delete_button.clicked.connect(self.delete_data)
-        button_layout.addWidget(delete_button)
-
-        close_button = QPushButton("Close")
-        close_button.setStyleSheet("background-color: #e63946; color: white; padding: 5px; border-radius: 3px;")
-        close_button.clicked.connect(self.close)
-        button_layout.addWidget(close_button)
-
-        layout.addLayout(button_layout)
-        self.setMinimumSize(800, 500)
-
-    def populate_table(self):
-        query = {"filename": self.filename, "project_name": self.project_name}
-        data = list(self.db.timeview_collection.find(query).sort("frameIndex", 1))
-        
-        self.table.setRowCount(len(data))
-        for row, item in enumerate(data):
-            self.table.setItem(row, 0, QTableWidgetItem(str(item.get("frameIndex", ""))))
-            self.table.setItem(row, 1, QTableWidgetItem(str(item.get("numberOfChannels", ""))))
-            sampling_rate = item.get("samplingRate", "")
-            self.table.setItem(row, 2, QTableWidgetItem(f"{sampling_rate:.2f}" if sampling_rate else ""))
-            self.table.setItem(row, 3, QTableWidgetItem(str(item.get("samplingSize", ""))))
-            created_at = item.get("createdAt", "")
-            self.table.setItem(row, 4, QTableWidgetItem(created_at if created_at else ""))
-        
-        self.table.resizeColumnsToContents()
-
-    def delete_data(self):
-        reply = QMessageBox.question(self, "Confirm Deletion", 
-                                     f"Are you sure you want to delete all data for {self.filename}?",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-        if reply == QMessageBox.No:
-            return
-
-        result = self.db.timeview_collection.delete_many({"filename": self.filename, "project_name": self.project_name})
-        if result.deleted_count > 0:
-            logging.info(f"Deleted {result.deleted_count} records for filename {self.filename}")
-            QMessageBox.information(self, "Success", f"Deleted data for {self.filename}")
-            if self.on_delete_callback:
-                self.on_delete_callback(self.filename)
-            self.close()
-        else:
-            logging.error(f"Failed to delete data for {self.filename}")
-            QMessageBox.warning(self, "Error", f"Failed to delete data for {self.filename}")
-
 class TimeViewFeature:
     def __init__(self, parent, db, project_name):
         self.parent = parent
@@ -91,11 +15,11 @@ class TimeViewFeature:
         self.project_name = project_name
         self.widget = QWidget()
         self.mqtt_tag = None
-        self.window_size = 1.0  # 1-second window
-        self.data_rate = 4096.0  # Fixed at 4096 Hz
+        self.window_size = 1.0
+        self.data_rate = 4096.0
         self.buffer_size = int(self.data_rate * self.window_size)
-        self.num_channels = 0  # Will be set dynamically
-        self.time_view_buffers = []  # Will be initialized dynamically
+        self.num_channels = 0
+        self.time_view_buffers = []
         self.time_view_timestamps = deque(maxlen=self.buffer_size)
         self.timer = QTimer(self.widget)
         self.timer.timeout.connect(self.update_time_view_plot)
@@ -104,10 +28,20 @@ class TimeViewFeature:
         self.last_data_time = None
         self.is_saving = False
         self.frame_index = 0
-        self.filename_counter = 1
-        self.axes = []
-        self.lines = []
+        self.filename_counter = self.get_next_filename_counter()
+        self.save_start_time = None
+        self.save_timer = QTimer(self.widget)
+        self.save_timer.timeout.connect(self.update_save_duration)
         self.initUI()
+
+    def get_next_filename_counter(self):
+        filenames = self.db.timeview_collection.distinct("filename", {"project_name": self.project_name})
+        max_counter = 0
+        for filename in filenames:
+            if filename.startswith("data") and filename[4:].isdigit():
+                counter = int(filename[4:])
+                max_counter = max(max_counter, counter)
+        return max_counter + 1
 
     def initUI(self):
         layout = QVBoxLayout()
@@ -149,18 +83,22 @@ class TimeViewFeature:
         self.filename_combo.currentTextChanged.connect(self.open_data_table)
 
         self.start_save_button = QPushButton("Start Saving")
-        self.start_save_button.setStyleSheet("background-color: #1a73e8; color: white; padding: 5px; border-radius: 3px;")
+        self.start_save_button.setStyleSheet("background-color: #1a73e8; color: white; padding: 15px; border-radius: 5px;font-size:15px")
         self.start_save_button.clicked.connect(self.start_saving)
         
         self.stop_save_button = QPushButton("Stop Saving")
-        self.stop_save_button.setStyleSheet("background-color: #e63946; color: white; padding: 5px; border-radius: 3px;")
+        self.stop_save_button.setStyleSheet("background-color: #e63946; color: white; padding: 15px; border-radius: 5px; font-size:15px")
         self.stop_save_button.clicked.connect(self.stop_saving)
         self.stop_save_button.setEnabled(False)
+
+        self.timer_label = QLabel("Save Duration: 00:00:00")
+        self.timer_label.setStyleSheet("color: white; font-size: 16px;")
 
         save_layout.addWidget(filename_label)
         save_layout.addWidget(self.filename_combo)
         save_layout.addWidget(self.start_save_button)
         save_layout.addWidget(self.stop_save_button)
+        save_layout.addWidget(self.timer_label)
         save_layout.addStretch()
         self.time_layout.addLayout(save_layout)
 
@@ -177,7 +115,6 @@ class TimeViewFeature:
         scroll_area.setWidget(self.time_widget)
         scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("background-color: black; border: none;color:black")
-        # scroll_area.setMinimumHeight(1000)
         scroll_area.setMaximumHeight(4000)
         layout.addWidget(scroll_area)
 
@@ -185,13 +122,22 @@ class TimeViewFeature:
             self.tag_combo.setCurrentIndex(0)
             self.setup_time_view_plot(self.tag_combo.currentText())
 
+    def update_save_duration(self):
+        if self.save_start_time:
+            duration = datetime.now() - self.save_start_time
+            seconds = duration.total_seconds()
+            hours = int(seconds // 3600)
+            minutes = int((seconds % 3600) // 60)
+            seconds = int(seconds % 60)
+            self.timer_label.setText(f"Save Duration: {hours:02d}:{minutes:02d}:{seconds:02d}")
+
     def refresh_filenames(self):
         filenames = self.db.timeview_collection.distinct("filename", {"project_name": self.project_name})
         self.filename_combo.clear()
         for filename in sorted(filenames):
             self.filename_combo.addItem(filename)
-        self.filename_combo.addItem(f"data {self.filename_counter}")
-        self.filename_combo.setCurrentText(f"data {self.filename_counter}")
+        self.filename_combo.addItem(f"data{self.filename_counter} (Next)")
+        self.filename_combo.setCurrentText(f"data{self.filename_counter} (Next)")
 
     def open_data_table(self, selected_filename):
         if "(Next)" in selected_filename:
@@ -199,11 +145,9 @@ class TimeViewFeature:
         
         if not self.db.timeview_collection.find_one({"filename": selected_filename, "project_name": self.project_name}):
             return
-        
-        dialog = DataTableDialog(self.db, self.project_name, selected_filename, self.widget, self.on_delete)
-        dialog.exec_()
 
     def on_delete(self, deleted_filename):
+        self.filename_counter = self.get_next_filename_counter()
         self.refresh_filenames()
         self.time_result.setText(f"Deleted data for {deleted_filename}")
 
@@ -216,30 +160,40 @@ class TimeViewFeature:
         filename = f"data{self.filename_counter}"
         self.is_saving = True
         self.frame_index = 0
+        self.save_start_time = datetime.now()
         self.start_save_button.setEnabled(False)
         self.stop_save_button.setEnabled(True)
+        self.save_timer.start(1000)  # Update timer every second
         self.parent.is_saving = True
         self.parent.play_action.setEnabled(False)
         self.parent.pause_action.setEnabled(True)
-        self.time_result.setText(f"Started saving data for {self.mqtt_tag} to {filename}")
+        start_time_str = self.save_start_time.strftime("%H:%M:%S")
+        self.time_result.setText(f"Started saving data for {self.mqtt_tag} to {filename} at {start_time_str}")
         logging.info(f"Started saving data for {self.mqtt_tag} with filename {filename}")
         QMessageBox.information(self.widget, "Success", 
-                               f"Started saving data for {self.mqtt_tag} to {filename}")
+                              f"Started saving data for {self.mqtt_tag} to {filename} at {start_time_str}")
 
     def stop_saving(self):
         self.is_saving = False
         self.start_save_button.setEnabled(True)
         self.stop_save_button.setEnabled(False)
+        self.save_timer.stop()
+        stop_time = datetime.now()
+        duration = stop_time - self.save_start_time
         self.parent.is_saving = False
         self.parent.play_action.setEnabled(True)
         self.parent.pause_action.setEnabled(False)
         filename = f"data{self.filename_counter}"
-        self.filename_counter += 1
-        self.refresh_filenames()
-        self.time_result.setText(f"Stopped saving data for {self.mqtt_tag}")
+        self.filename_counter = self.get_next_filename_counter()
+        start_time_str = self.save_start_time.strftime("%H:%M:%S")
+        stop_time_str = stop_time.strftime("%H:%M:%S")
+        self.timer_label.setText("Save Duration: 00:00:00")
+        self.time_result.setText(f"Stopped saving data for {self.mqtt_tag} from {start_time_str} to {stop_time_str} (Duration: {str(duration).split('.')[0]})")
         logging.info(f"Stopped saving data for {self.mqtt_tag}")
         QMessageBox.information(self.widget, "Success", 
-                               f"Stopped saving data for {self.mqtt_tag}")
+                              f"Stopped saving data for {self.mqtt_tag} from {start_time_str} to {stop_time_str}")
+        self.save_start_time = None
+        self.refresh_filenames()
 
     def setup_time_view_plot(self, tag_name):
         if not self.project_name or not tag_name or tag_name == "No Tags Available":
@@ -249,7 +203,7 @@ class TimeViewFeature:
 
         self.mqtt_tag = tag_name
         self.timer.stop()
-        self.timer.setInterval(100)  # Update every 100ms
+        self.timer.setInterval(100)
         self.time_view_buffers = []
         self.time_view_timestamps.clear()
         self.last_data_time = None
@@ -258,12 +212,16 @@ class TimeViewFeature:
         self.is_saving = False
         self.start_save_button.setEnabled(True)
         self.stop_save_button.setEnabled(False)
+        self.save_timer.stop()
+        self.timer_label.setText("Save Duration: 00:00:00")
+        self.timer_label.setStyleSheet("""
+        font-size:20px;color:white;background-color:red
+        """)
         self.frame_index = 0
         self.parent.is_saving = False
         self.parent.play_action.setEnabled(True)
         self.parent.pause_action.setEnabled(False)
 
-        # Clear existing plot
         self.figure.clear()
         self.axes = []
         self.lines = []
@@ -273,7 +231,7 @@ class TimeViewFeature:
 
     def initialize_plot(self, num_channels):
         if num_channels == self.num_channels and self.axes:
-            return  # No need to reinitialize if channel count hasn't changed
+            return
 
         self.num_channels = num_channels
         self.time_view_buffers = [deque(maxlen=self.buffer_size) for _ in range(num_channels)]
@@ -281,7 +239,6 @@ class TimeViewFeature:
         self.axes = []
         self.lines = []
 
-        # Dynamically create subplots
         for i in range(num_channels):
             ax = self.figure.add_subplot(num_channels, 1, i+1)
             line, = ax.plot([], [], f'C{i}-', linewidth=1.5)
@@ -309,7 +266,6 @@ class TimeViewFeature:
                 self.time_result.setText(f"Warning: Received {len(values)} values, expected at least 10.")
                 return
 
-            # Extract metadata from indices 0 to 9
             frame_index = values[0] + (values[1] * 65535)
             number_of_channels = values[2]
             sampling_rate = values[3]
@@ -320,14 +276,12 @@ class TimeViewFeature:
             slot8 = str(values[8])
             slot9 = str(values[9])
 
-            # Use data from index 10 onward for plotting
             plot_values = values[10:]
             if len(plot_values) % number_of_channels != 0:
                 logging.warning(f"Unexpected number of plot values: {len(plot_values)}. Expected multiple of {number_of_channels}.")
                 self.time_result.setText(f"Warning: Received {len(plot_values)} plot values, expected multiple of {number_of_channels}.")
                 return
 
-            # Initialize plot if number of channels has changed or not initialized
             if number_of_channels != self.num_channels or not self.axes:
                 self.initialize_plot(number_of_channels)
 
@@ -335,16 +289,14 @@ class TimeViewFeature:
             start_time = datetime.fromisoformat(timestamp.replace('Z', '+00:00')) if 'Z' in timestamp else datetime.fromisoformat(timestamp)
             timestamps = [start_time + timedelta(seconds=i / self.data_rate) for i in range(num_samples)]
 
-            # Store plot values in buffers
             for i in range(0, len(plot_values), number_of_channels):
                 sample_idx = i // number_of_channels
                 for j, buf in enumerate(self.time_view_buffers):
                     buf.append(plot_values[i + j])
                 self.time_view_timestamps.append(timestamps[sample_idx])
 
-            # Save data to database if saving is enabled
             if self.is_saving:
-                filename = f"data{self.filename_counter}"
+                filename = f"data{self.filename_counter - 1}"  # Use current counter minus 1 as we're still saving to this file
                 message_data = {
                     "project_name": self.project_name,
                     "topic": self.mqtt_tag,
