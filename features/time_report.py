@@ -1,5 +1,6 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QTextEdit, QScrollArea, QDateTimeEdit)
-from PyQt5.QtCore import Qt, QDateTime
+from PyQt5.QtCore import Qt, QDateTime, QRect, pyqtSignal
+from PyQt5.QtGui import QPainter, QPen, QBrush, QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
@@ -8,16 +9,117 @@ from datetime import datetime, timedelta
 import logging
 import re
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class QRangeSlider(QWidget):
+    """Custom dual slider widget for selecting a time range."""
+    valueChanged = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumHeight(30)
+        self.setMinimumWidth(300)
+        self.min_value = 0
+        self.max_value = 1000
+        self.left_value = 0
+        self.right_value = 1000
+        self.dragging = None
+        self.setMouseTracking(True)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #34495e;
+            }
+        """)
+
+    def setRange(self, min_val, max_val):
+        self.min_value = min_val
+        self.max_value = max_val
+        self.update()
+
+    def setValues(self, left, right):
+        self.left_value = max(self.min_value, min(left, self.right_value - 10))
+        self.right_value = min(self.max_value, max(right, self.left_value + 10))
+        self.update()
+        self.valueChanged.emit()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Groove
+        groove_rect = QRect(int(10), int(10), int(self.width() - 20), int(8))
+        painter.setPen(QPen(QColor("#1a73e8")))
+        painter.setBrush(QColor("#34495e"))
+        painter.drawRoundedRect(groove_rect, 4, 4)
+
+        # Selected range
+        left_pos = int(self._value_to_pos(self.left_value))
+        right_pos = int(self._value_to_pos(self.right_value))
+        if left_pos >= right_pos - 18:
+            right_pos = left_pos + 18
+        selected_rect = QRect(left_pos, int(10), int(right_pos - left_pos), int(8))
+        painter.setBrush(QColor("#90caf9"))
+        painter.drawRoundedRect(selected_rect, 4, 4)
+
+        # Handles with dynamic color based on dragging state
+        painter.setPen(QPen(QColor("#1a73e8")))
+        if self.dragging == 'left':
+            painter.setBrush(QColor("#42a5f5"))
+        else:
+            painter.setBrush(QColor("#1a73e8"))
+        painter.drawEllipse(left_pos - 9, 6, 18, 18)
+
+        if self.dragging == 'right':
+            painter.setBrush(QColor("#42a5f5"))
+        else:
+            painter.setBrush(QColor("#1a73e8"))
+        painter.drawEllipse(right_pos - 9, 6, 18, 18)
+
+    def _value_to_pos(self, value):
+        return 10 + (self.width() - 20) * (value - self.min_value) / (self.max_value - self.min_value)
+
+    def _pos_to_value(self, pos):
+        value = self.min_value + (pos - 10) / (self.width() - 20) * (self.max_value - self.min_value)
+        return max(self.min_value, min(self.max_value, value))
+
+    def mousePressEvent(self, event):
+        pos = event.pos().x()
+        left_pos = int(self._value_to_pos(self.left_value))
+        right_pos = int(self._value_to_pos(self.right_value))
+        if abs(pos - left_pos) < 10:
+            self.dragging = 'left'
+        elif abs(pos - right_pos) < 10:
+            self.dragging = 'right'
+        self.update()
+
+    def mouseMoveEvent(self, event):
+        if self.dragging:
+            pos = event.pos().x()
+            value = self._pos_to_value(pos)
+            if self.dragging == 'left':
+                self.left_value = max(self.min_value, min(value, self.right_value - 10))
+            elif self.dragging == 'right':
+                self.right_value = min(self.max_value, max(value, self.left_value + 10))
+            self.update()
+            self.valueChanged.emit()
+
+    def mouseReleaseEvent(self, event):
+        self.dragging = None
+        self.update()
+
+    def getValues(self):
+        return self.left_value, self.right_value
 
 class TimeReportFeature:
     def __init__(self, parent, db, project_name):
         self.parent = parent
         self.db = db
         self.project_name = project_name
-        self.widget = QWidget()
+        self.widget = QWidget(self.parent)
         self.figure = plt.Figure(figsize=(10, 6))
         self.canvas = FigureCanvas(self.figure)
+        self.file_start_time = None
+        self.file_end_time = None
         self.initUI()
 
     def initUI(self):
@@ -39,62 +141,55 @@ class TimeReportFeature:
         file_label.setStyleSheet("color: white; font-size: 16px;")
         self.file_combo = QComboBox()
         self.file_combo.setStyleSheet("""QComboBox {
-        background-color: #fdfdfd;
-        color: #212121;
-        border: 2px solid #90caf9;
-        border-radius: 8px;
-        padding: 10px 40px 10px 14px;
-        font-size: 16px;
-        font-weight: 600;
-        min-width: 220px;
-        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
-    }
-
-    QComboBox:hover {
-        border: 2px solid #42a5f5;
-        background-color: #f5faff;
-    }
-
-    QComboBox:focus {
-        border: 2px solid #1e88e5;
-        background-color: #ffffff;
-    }
-
-    QComboBox::drop-down {
-        subcontrol-origin: padding;
-        subcontrol-position: top right;
-        width: 36px;
-        border-left: 1px solid #e0e0e0;
-        background-color: #e3f2fd;
-        border-top-right-radius: 8px;
-        border-bottom-right-radius: 8px;
-    }
-
-    QComboBox QAbstractItemView {
-        background-color: #ffffff;
-        border: 1px solid #90caf9;
-        border-radius: 4px;
-        padding: 5px;
-        selection-background-color: #e3f2fd;
-        selection-color: #0d47a1;
-        font-size: 15px;
-        outline: 0;
-    }
-
-    QComboBox::item {
-        padding: 10px 8px;
-        border: none;
-    }
-
-    QComboBox::item:selected {
-        background-color: #bbdefb;
-        color: #0d47a1;
-    }
-""")
+            background-color: #fdfdfd;
+            color: #212121;
+            border: 2px solid #90caf9;
+            border-radius: 8px;
+            padding: 10px 40px 10px 14px;
+            font-size: 16px;
+            font-weight: 600;
+            min-width: 220px;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
+        }
+        QComboBox:hover {
+            border: 2px solid #42a5f5;
+            background-color: #f5faff;
+        }
+        QComboBox:focus {
+            border: 2px solid #1e88e5;
+            background-color: #ffffff;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 36px;
+            border-left: 1px solid #e0e0e0;
+            background-color: #e3f2fd;
+            border-top-right-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+        QComboBox QAbstractItemView {
+            background-color: #ffffff;
+            border: 1px solid #90caf9;
+            border-radius: 4px;
+            padding: 5px;
+            selection-background-color: #e3f2fd;
+            selection-color: #0d47a1;
+            font-size: 15px;
+            outline: 0;
+        }
+        QComboBox::item {
+            padding: 10px 8px;
+            border: none;
+        }
+        QComboBox::item:selected {
+            background-color: #bbdefb;
+            color: #0d47a1;
+        }""")
         self.file_combo.currentTextChanged.connect(self.update_time_labels)
 
         self.ok_button = QPushButton("OK")
-        self.ok_button.setStyleSheet("background-color: #1a73e8; color: white; padding: 15px; border-radius: 5px; font-size:15px;width:100px;border-radius:50%")
+        self.ok_button.setStyleSheet("background-color: #1a73e8; color: white; padding: 15px; font-size:15px;width:100px;border-radius:50%;font:bold")
         self.ok_button.clicked.connect(self.plot_data)
         self.ok_button.setEnabled(False)
 
@@ -128,6 +223,17 @@ class TimeReportFeature:
         time_range_layout.addWidget(self.end_time_edit)
         time_range_layout.addStretch()
         self.report_layout.addLayout(time_range_layout)
+
+        # Dual time range slider
+        slider_layout = QHBoxLayout()
+        slider_label = QLabel("Drag Time Range:")
+        slider_label.setStyleSheet("color: white; font-size: 16px;")
+        self.time_slider = QRangeSlider(self.widget)
+        self.time_slider.valueChanged.connect(self.update_time_from_slider)
+        slider_layout.addWidget(slider_label)
+        slider_layout.addWidget(self.time_slider)
+        slider_layout.addStretch()
+        self.report_layout.addLayout(slider_layout)
 
         # Time labels
         time_info_layout = QHBoxLayout()
@@ -174,6 +280,7 @@ class TimeReportFeature:
                 self.stop_time_label.setText("File Stop Time: N/A")
                 self.start_time_edit.setEnabled(False)
                 self.end_time_edit.setEnabled(False)
+                self.time_slider.setEnabled(False)
                 self.ok_button.setEnabled(False)
                 self.figure.clear()
                 self.canvas.draw()
@@ -182,6 +289,7 @@ class TimeReportFeature:
                     self.file_combo.addItem(filename)
                 self.start_time_edit.setEnabled(True)
                 self.end_time_edit.setEnabled(True)
+                self.time_slider.setEnabled(True)
                 self.ok_button.setEnabled(True)
                 self.update_time_labels(self.file_combo.currentText())
         except Exception as e:
@@ -192,18 +300,22 @@ class TimeReportFeature:
             self.stop_time_label.setText("File Stop Time: N/A")
             self.start_time_edit.setEnabled(False)
             self.end_time_edit.setEnabled(False)
+            self.time_slider.setEnabled(False)
             self.ok_button.setEnabled(False)
             self.figure.clear()
             self.canvas.draw()
 
     def update_time_labels(self, filename):
-        """Update file start and stop time labels and set default range for time edits."""
+        """Update file start and stop time labels and set default range for time edits and slider."""
         if not filename or filename in ["No Files Available", "Error Loading Files"]:
             self.start_time_label.setText("File Start Time: N/A")
             self.stop_time_label.setText("File Stop Time: N/A")
             self.start_time_edit.setEnabled(False)
             self.end_time_edit.setEnabled(False)
+            self.time_slider.setEnabled(False)
             self.ok_button.setEnabled(False)
+            self.file_start_time = None
+            self.file_end_time = None
             return
 
         try:
@@ -216,8 +328,11 @@ class TimeReportFeature:
                 self.stop_time_label.setText("File Stop Time: N/A")
                 self.start_time_edit.setEnabled(False)
                 self.end_time_edit.setEnabled(False)
+                self.time_slider.setEnabled(False)
                 self.ok_button.setEnabled(False)
                 self.result_text.setText(f"No data found for file: {filename}")
+                self.file_start_time = None
+                self.file_end_time = None
                 return
 
             timestamps = []
@@ -231,30 +346,69 @@ class TimeReportFeature:
                     continue
 
             if timestamps:
-                start_time = min(timestamps)
-                stop_time = max(timestamps)
-                self.start_time_label.setText(f"File Start Time: {start_time.strftime('%H:%M:%S')}")
-                self.stop_time_label.setText(f"File Stop Time: {stop_time.strftime('%H:%M:%S')}")
+                self.file_start_time = min(timestamps)
+                self.file_end_time = max(timestamps)
+                self.start_time_label.setText(f"File Start Time: {self.file_start_time.strftime('%H:%M:%S')}")
+                self.stop_time_label.setText(f"File Stop Time: {self.file_end_time.strftime('%H:%M:%S')}")
                 self.start_time_edit.setEnabled(True)
                 self.end_time_edit.setEnabled(True)
+                self.time_slider.setEnabled(True)
                 self.ok_button.setEnabled(True)
                 # Set default range to file's full duration
-                self.start_time_edit.setDateTime(QDateTime(start_time))
-                self.end_time_edit.setDateTime(QDateTime(stop_time))
+                self.start_time_edit.setDateTime(QDateTime(self.file_start_time))
+                self.end_time_edit.setDateTime(QDateTime(self.file_end_time))
+                # Reset slider to full range
+                self.time_slider.setValues(0, 1000)
             else:
                 self.start_time_label.setText("File Start Time: N/A")
                 self.stop_time_label.setText("File Stop Time: N/A")
                 self.start_time_edit.setEnabled(False)
                 self.end_time_edit.setEnabled(False)
+                self.time_slider.setEnabled(False)
                 self.ok_button.setEnabled(False)
+                self.file_start_time = None
+                self.file_end_time = None
         except Exception as e:
             logging.error(f"Error updating time labels for {filename}: {e}")
             self.start_time_label.setText("File Start Time: N/A")
             self.stop_time_label.setText("File Stop Time: N/A")
             self.start_time_edit.setEnabled(False)
             self.end_time_edit.setEnabled(False)
+            self.time_slider.setEnabled(False)
             self.ok_button.setEnabled(False)
             self.result_text.setText(f"Error loading time data for {filename}: {str(e)}")
+            self.file_start_time = None
+            self.file_end_time = None
+
+    def update_time_from_slider(self):
+        """Update time range based on dual slider positions."""
+        if not self.file_start_time or not self.file_end_time:
+            return
+
+        total_duration = (self.file_end_time - self.file_start_time).total_seconds()
+        if total_duration <= 0:
+            return
+
+        # Get slider values (0 to 1000)
+        left_pos, right_pos = self.time_slider.getValues()
+        left_fraction = left_pos / 1000.0
+        right_fraction = right_pos / 1000.0
+
+        # Calculate start and end times
+        start_seconds = left_fraction * total_duration
+        end_seconds = right_fraction * total_duration
+        start_time = self.file_start_time + timedelta(seconds=start_seconds)
+        end_time = self.file_start_time + timedelta(seconds=end_seconds)
+
+        # Update QDateTimeEdit widgets
+        self.start_time_edit.blockSignals(True)
+        self.end_time_edit.blockSignals(True)
+        self.start_time_edit.setDateTime(QDateTime(start_time))
+        self.end_time_edit.setDateTime(QDateTime(end_time))
+        self.start_time_edit.blockSignals(False)
+        self.end_time_edit.blockSignals(False)
+
+        self.validate_time_range()
 
     def validate_time_range(self):
         """Validate the selected time range."""
@@ -265,6 +419,17 @@ class TimeReportFeature:
             self.result_text.setText("Error: Start time must be before end time.")
         else:
             self.ok_button.setEnabled(True)
+            # Update slider to reflect manual time changes
+            if self.file_start_time and self.file_end_time:
+                total_duration = (self.file_end_time - self.file_start_time).total_seconds()
+                if total_duration > 0:
+                    start_offset = (start_time - self.file_start_time).total_seconds()
+                    end_offset = (end_time - self.file_start_time).total_seconds()
+                    left_pos = (start_offset / total_duration) * 1000
+                    right_pos = (end_offset / total_duration) * 1000
+                    self.time_slider.blockSignals(True)
+                    self.time_slider.setValues(int(left_pos), int(right_pos))
+                    self.time_slider.blockSignals(False)
 
     def plot_data(self):
         """Plot data for the selected filename within the specified time range, replicating TimeView style with hh:mm:sss x-axis."""
@@ -299,7 +464,7 @@ class TimeReportFeature:
 
             # Get number of channels and sampling rate
             num_channels = data[0].get("numberOfChannels", 1)
-            data_rate = data[0].get("samplingRate", 4096.0)  # Default to 4096 Hz as in TimeView
+            data_rate = data[0].get("samplingRate", 4096.0)
             if not isinstance(num_channels, int) or num_channels < 1:
                 self.result_text.setText(f"Invalid number of channels ({num_channels}) for file: {filename}")
                 self.figure.clear()
@@ -369,9 +534,8 @@ class TimeReportFeature:
 
             # Formatter for x-axis to display hh:mm:sss
             def time_formatter(x, pos):
-                # Convert seconds offset to actual timestamp
                 actual_time = start_time + timedelta(seconds=x)
-                return actual_time.strftime('%H:%M:%S.%f')[:-3]  # hh:mm:ss.sss
+                return actual_time.strftime('%H:%M:%S') + '\n' + actual_time.strftime('%d-%m-%Y')
 
             for channel in range(num_channels):
                 ax = self.figure.add_subplot(num_channels, 1, channel + 1)
@@ -379,10 +543,9 @@ class TimeReportFeature:
                     line, = ax.plot(time_points, channel_values[channel], f'C{channel}-', linewidth=1.5)
                     lines.append(line)
                     ax.grid(True, linestyle='--', alpha=0.7)
-                    ax.set_ylabel(f"Channel {channel + 1}", rotation=90, labelpad=10)
+                    ax.set_ylabel(f"Channel {channel + 1}", rotation=0, labelpad=40, fontweight='bold')
                     ax.yaxis.set_label_position("right")
                     ax.yaxis.tick_right()
-                    ax.set_xlabel("Time (hh:mm:ss.sss)")
                     ax.set_xlim(0, window_size)
 
                     # Set x-axis ticks and formatter
@@ -402,7 +565,7 @@ class TimeReportFeature:
                     ticks = np.arange(np.floor(y_min / step) * step, y_max + step, step)
                     ax.set_yticks(ticks)
                 else:
-                    ax.set_visible(False)  # Hide empty subplots
+                    ax.set_visible(False)
                 axes.append(ax)
 
             self.figure.subplots_adjust(left=0.05, right=0.85, top=0.95, bottom=0.15, hspace=0.4)

@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLay
                              QToolBar, QAction, QTreeWidget, QTreeWidgetItem, QInputDialog, QMessageBox,
                              QSizePolicy, QApplication)
 from PyQt5.QtCore import Qt, QSize, QTimer, QCoreApplication
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QColor
 import os
 from mqtthandler import MQTTHandler  # Assumes QThread-based MQTTHandler
 from features.create_tags import CreateTagsFeature
@@ -112,7 +112,7 @@ class DashboardWindow(QWidget):
                 border-radius: 4px;
             }
             QToolBar QToolButton:hover {
-                background-color: #3498db;
+                background-color: #F5F5F5;
             }
         """)
         self.file_bar.setFixedHeight(40)
@@ -135,7 +135,7 @@ class DashboardWindow(QWidget):
 
         # Navigation toolbar
         self.toolbar = QToolBar("Navigation")
-        self.toolbar.setFixedHeight(150)
+        self.toolbar.setFixedHeight(80)
         self.toolbar.setStyleSheet("""
             QToolBar{
                 background-color: white;
@@ -173,8 +173,8 @@ class DashboardWindow(QWidget):
                 color: white;
             }
             QHeaderView::section {
-                background-color: white;
-                color: black;
+                background-color: #1e2937;
+                color: white;
                 font-size: 16px;
                 font-weight: bold;
                 padding: 8px;
@@ -198,22 +198,25 @@ class DashboardWindow(QWidget):
         main_splitter.setSizes([250, 1000])  # Adjusted for better proportion
 
     def update_toolbar(self):
-        """Update the navigation toolbar."""
+        """Update the navigation toolbar with text-based icons."""
         self.toolbar.clear()
         self.toolbar.setStyleSheet("""
             QToolBar {
-                background-color: #3e4e75  ;
+                background-color:#0A9396;
                 border: none;
                 padding: 5px;
                 spacing: 5px;
-                gap:50px;
+                gap: 50px;
             }
             QToolButton {
                 border: none;
                 padding: 6px;
                 border-radius: 4px;
                 background-color: black;
-                margin-bottom:80px   
+                font-size: 24px;
+                margin-bottom:20px;
+                color: white;
+                height:250px;
             }
             QToolButton:hover {
                 background-color: #3498db;
@@ -228,32 +231,86 @@ class DashboardWindow(QWidget):
         """)
         self.toolbar.setIconSize(QSize(50, 50))
         self.toolbar.setContentsMargins(0, 0, 0, 0)
-
         self.toolbar.setMovable(False)
         self.toolbar.setFloatable(False)
 
-        def add_action(text, icon_path, callback, tooltip=None):
-            icon = QIcon(icon_path) if os.path.exists(icon_path) else QIcon()
-            action = QAction(icon, text, self)
+        def add_action(text, text_icon, color, callback, tooltip=None):
+            action = QAction(text_icon, self)
             action.triggered.connect(callback)
             if tooltip:
                 action.setToolTip(tooltip)
             self.toolbar.addAction(action)
+            # Style the QToolButton for this action
+            button = self.toolbar.widgetForAction(action)
+            if button:
+                button.setStyleSheet(f"""
+                    QToolButton {{
+                        color: {color};
+                        font-size: 24px;
+                        border: none;
+                        padding: 6px;
+                        border-radius: 4px;
+                        background-color: black;
+                    }}
+                    QToolButton:hover {{
+                        background-color: #3498db;
+                    }}
+                    QToolButton:pressed {{
+                        background-color: #2980b9;
+                    }}
+                """)
 
-        add_action("", "icons/new.png", self.create_project, "Create a New Project")
-        add_action("", "icons/save.png", self.save_action, "Save Project")
-        add_action("", "icons/refresh.png", self.refresh_action, "Refresh View")
-        add_action("", "icons/edit.png", self.edit_project_dialog, "Edit Project Name")
+        # Define actions with text icons and their respective colors
+        add_action("", "🆕", "#00cc00", self.create_project, "Create a New Project")
+        add_action("", "💾", "#ff9900", self.save_action, "Save Project")
+        add_action("", "🔄", "#3399ff", self.refresh_action, "Refresh View")
+        add_action("", "✏️", "#cc33ff", self.edit_project_dialog, "Edit Project Name")
 
-        self.play_action = QAction(QIcon("icons/record.png"), "", self)
+        self.play_action = QAction("▶️", self)
         self.play_action.triggered.connect(self.start_saving)
         self.play_action.setToolTip("Start Saving Data (Time View)")
         self.toolbar.addAction(self.play_action)
+        play_button = self.toolbar.widgetForAction(self.play_action)
+        if play_button:
+            play_button.setStyleSheet("""
+                QToolButton {
+                    color: #00ff00;
+                    font-size: 24px;
+                    border: none;
+                    padding: 6px;
+                    border-radius: 4px;
+                    background-color: black;
+                }
+                QToolButton:hover {
+                    background-color: #3498db;
+                }
+                QToolButton:pressed {
+                    background-color: #2980b9;
+                }
+            """)
 
-        self.pause_action = QAction(QIcon("icons/pause.png"), "", self)
+        self.pause_action = QAction("⏸️", self)
         self.pause_action.triggered.connect(self.stop_saving)
         self.pause_action.setToolTip("Stop Saving Data (Time View)")
         self.toolbar.addAction(self.pause_action)
+        pause_button = self.toolbar.widgetForAction(self.pause_action)
+        if pause_button:
+            pause_button.setStyleSheet("""
+                QToolButton {
+                    color: #ff3333;
+                    font-size: 24px;
+                    border: none;
+                    padding: 6px;
+                    border-radius: 4px;
+                    background-color: black;
+                }
+                QToolButton:hover {
+                    background-color: #3498db;
+                }
+                QToolButton:pressed {
+                    background-color: #2980b9;
+                }
+            """)
 
         is_time_view = self.current_feature == "Time View"
         self.play_action.setEnabled(is_time_view and not self.is_saving)
@@ -262,7 +319,7 @@ class DashboardWindow(QWidget):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
-        add_action("", "icons/settings.png", self.settings_action, "Settings")
+        add_action("", "⚙️", "#999999", self.settings_action, "Settings")
 
     def load_project_features(self):
         """Load features for the current project into the tree."""
@@ -285,31 +342,29 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Failed to load project features: {str(e)}")
 
     def add_project_to_tree(self, project_name):
-        """Add the current project and its features to the tree widget."""
+        """Add the current project and its features to the tree widget with text icons."""
         project_item = QTreeWidgetItem(self.tree)
-        project_item.setText(0, project_name)
-        project_item.setIcon(0, QIcon("icons/folder.png") if os.path.exists("icons/folder.png") else QIcon())
+        project_item.setText(0, f"📁 {project_name}")
         project_item.setData(0, Qt.UserRole, {"type": "project", "name": project_name})
 
         features = [
-            ("Create Tags", "icons/tag.png"),
-            ("Time View", "icons/time.png"),
-            ("Tabular View", "icons/table.png"),
-            ("FFT", "icons/fft.png"),
-            ("Waterfall", "icons/waterfall.png"),
-            ("Orbit", "icons/orbit.png"),
-            ("Trend View", "icons/trend.png"),
-            ("Multiple Trend View", "icons/multitrend.png"),
-            ("Bode Plot", "icons/bode.png"),
-            ("History Plot", "icons/history.png"),
-            ("Time Report", "icons/report.png"),
-            ("Report", "icons/report.png")
+            ("Create Tags", "🏷️"),
+            ("Time View", "⏱️"),
+            ("Tabular View", "📋"),
+            ("FFT", "📈"),
+            ("Waterfall", "🌊"),
+            ("Orbit", "🪐"),
+            ("Trend View", "📉"),
+            ("Multiple Trend View", "📊"),
+            ("Bode Plot", "🔍"),
+            ("History Plot", "🕰️"),
+            ("Time Report", "📄"),
+            ("Report", "📝")
         ]
 
-        for feature, icon_path in features:
+        for feature, text_icon in features:
             feature_item = QTreeWidgetItem(project_item)
-            feature_item.setText(0, feature)
-            feature_item.setIcon(0, QIcon(icon_path) if os.path.exists(icon_path) else QIcon())
+            feature_item.setText(0, f"{text_icon} {feature}")
             feature_item.setData(0, Qt.UserRole, {"type": "feature", "name": feature, "project": project_name})
 
     def on_tree_item_clicked(self, item, column):
@@ -327,7 +382,6 @@ class DashboardWindow(QWidget):
         except Exception as e:
             logging.error(f"Error handling tree item click: {str(e)}")
             QMessageBox.warning(self, "Error", f"Error handling tree item click: {str(e)}")
-            
 
     def create_project(self):
         """Create a new project."""
@@ -564,7 +618,7 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Error refreshing view: {str(e)}")
 
     def display_dashboard(self):
-        # """Display the default view for the project."""
+        """Display the default view for the project."""
         self.current_feature = None
         self.is_saving = False
         self.timer.stop()

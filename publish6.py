@@ -66,7 +66,7 @@ class MQTTPublisher(QObject):
 
             # Pack into binary
             binary_message = struct.pack(f"{len(message_values)}H", *message_values)
-            print(len(all_channel_data))
+            # print(len(all_channel_data))
 
             for topic in self.topics:
                 try:
