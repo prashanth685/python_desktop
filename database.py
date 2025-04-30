@@ -2,6 +2,7 @@ from pymongo import MongoClient, ASCENDING
 import datetime
 from bson.objectid import ObjectId
 import logging
+import re
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -57,7 +58,7 @@ class Database:
             raise
 
     def _create_timeview_indexes(self):
-        """Create indexes for timeview_messages collection based on Mongoose schema."""
+        """Create indexes for timeview_messages collection."""
         try:
             self.timeview_collection.create_index([("topic", ASCENDING)])
             self.timeview_collection.create_index([("filename", ASCENDING)])
@@ -78,7 +79,7 @@ class Database:
                 self.tags_collection = None
                 self.messages_collection = None
                 self.timeview_collection = None
-                logging.info("MongoDB connection closed.")
+                logging.info("MongoDB connection closed")
             except Exception as e:
                 logging.error(f"Error closing MongoDB connection: {str(e)}")
 
@@ -87,8 +88,8 @@ class Database:
         self.projects.clear()
         try:
             for project in self.user_collection.find():
-                project_name = project["project_name"]
-                if project_name not in self.projects:
+                project_name = project.get("project_name")
+                if project_name and project_name not in self.projects:
                     self.projects.append(project_name)
             logging.info(f"Loaded projects: {self.projects}")
             return self.projects
@@ -120,7 +121,7 @@ class Database:
     def edit_project(self, old_project_name, new_project_name):
         """Rename a project and update related collections."""
         if new_project_name == old_project_name:
-            return True, "No change made."
+            return True, "No change made"
         if self.user_collection.find_one({"project_name": new_project_name}):
             return False, "Project already exists!"
         
@@ -129,7 +130,8 @@ class Database:
                 {"project_name": old_project_name},
                 {"$set": {"project_name": new_project_name}}
             )
-            self.projects[self.projects.index(old_project_name)] = new_project_name
+            if old_project_name in self.projects:
+                self.projects[self.projects.index(old_project_name)] = new_project_name
             self.tags_collection.update_many(
                 {"project_name": old_project_name},
                 {"$set": {"project_name": new_project_name}}
@@ -250,10 +252,7 @@ class Database:
             return False, f"Failed to delete tag: {str(e)}"
 
     def update_tag_value(self, project_name, tag_name, values, timestamp=None):
-        """
-        Disabled saving to messages_collection to prevent automatic storage of MQTT data.
-        Data is only saved to timeview_collection when user initiates saving in TimeViewFeature.
-        """
+        """Receive tag values without saving to messages_collection."""
         if not self.get_project_data(project_name):
             logging.error(f"Project {project_name} not found!")
             return False, "Project not found!"
@@ -265,7 +264,7 @@ class Database:
         
         timestamp_str = timestamp if timestamp else datetime.datetime.now().isoformat()
         logging.debug(f"Received {len(values)} values for {tag_name} in {project_name} at {timestamp_str}")
-        return True, "Tag values received but not saved to mqttmessage collection."
+        return True, "Tag values received but not saved to mqttmessage collection"
 
     def get_tag_values(self, project_name, tag_name):
         """Retrieve tag values for a project."""
@@ -324,21 +323,22 @@ class Database:
         
         required_fields = ["topic", "filename", "frameIndex", "message"]
         for field in required_fields:
-            if field not in message_data:
-                logging.error(f"Missing required field {field} in timeview message")
-                return False, f"Missing required field: {field}"
+            if field not in message_data or message_data[field] is None:
+                logging.error(f"Missing or invalid required field {field} in timeview message")
+                return False, f"Missing or invalid required field: {field}"
         
-        message_data.setdefault("numberOfChannels", None)
+        message_data.setdefault("numberOfChannels", 1)
         message_data.setdefault("samplingRate", None)
         message_data.setdefault("samplingSize", None)
         message_data.setdefault("messageFrequency", None)
+        message_data.setdefault("createdAt", datetime.datetime.now().isoformat())
         
         message_data["project_name"] = project_name
         message_data["_id"] = ObjectId()
         
         try:
             result = self.timeview_collection.insert_one(message_data)
-            logging.debug(f"Saved timeview message for {message_data['topic']} in {project_name}: {result.inserted_id}")
+            logging.info(f"Saved timeview message for {message_data['topic']} in {project_name} with filename {message_data['filename']}: {result.inserted_id}")
             return True, "Timeview message saved successfully!"
         except Exception as e:
             logging.error(f"Error saving timeview message: {str(e)}")
@@ -366,4 +366,19 @@ class Database:
             return messages
         except Exception as e:
             logging.error(f"Error fetching timeview messages: {str(e)}")
+            return []
+
+    def get_distinct_filenames(self, project_name):
+        """Retrieve distinct filenames for a project from timeview_collection."""
+        if not self.get_project_data(project_name):
+            logging.error(f"Project {project_name} not found!")
+            return []
+        
+        try:
+            filenames = self.timeview_collection.distinct("filename", {"project_name": project_name})
+            sorted_filenames = sorted(filenames, key=lambda x: int(re.match(r"data(\d+)", x).group(1)) if re.match(r"data(\d+)", x) else 0)
+            logging.debug(f"Retrieved {len(sorted_filenames)} distinct filenames for project {project_name}")
+            return sorted_filenames
+        except Exception as e:
+            logging.error(f"Error fetching distinct filenames: {str(e)}")
             return []

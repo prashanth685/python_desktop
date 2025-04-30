@@ -89,14 +89,31 @@ class DashboardWindow(QWidget):
         self.setWindowTitle(f'Sarayu Desktop Application - {self.current_project.upper()}')
         self.showMaximized()
 
+        # Main layout with no margins
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         self.setLayout(main_layout)
 
+        # File toolbar
         self.file_bar = QToolBar("File")
         self.file_bar.setStyleSheet("""
-            QToolBar { background-color: #c3cb9b; border: none; padding: 5px; spacing: 10px; }
-            QToolBar QToolButton { font-size: 20px; font-weight: bold; padding: 5px; }
-            QToolBar QToolButton:hover { background-color: #lightblue; padding: 10px; }
+            QToolBar {
+                background-color: #c8cca6;
+                border: none;
+                padding: 0;
+                spacing: 5px;
+            }
+            QToolBar QToolButton {
+                font-size: 20px;
+                font-weight: bold;
+                color: black;
+                padding: 8px 12px;
+                border-radius: 4px;
+            }
+            QToolBar QToolButton:hover {
+                background-color: #3498db;
+            }
         """)
         self.file_bar.setFixedHeight(40)
         self.file_bar.setMovable(False)
@@ -116,55 +133,102 @@ class DashboardWindow(QWidget):
             self.file_bar.addAction(action)
         main_layout.addWidget(self.file_bar)
 
+        # Navigation toolbar
         self.toolbar = QToolBar("Navigation")
+        self.toolbar.setFixedHeight(150)
+        self.toolbar.setStyleSheet("""
+            QToolBar{
+                background-color: white;
+            }
+        """)
         self.update_toolbar()
         main_layout.addWidget(self.toolbar)
 
+        # Main splitter for tree and content
         main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter.setContentsMargins(0, 0, 0, 0)
+        main_splitter.setHandleWidth(1)
+        main_splitter.setStyleSheet("QSplitter::handle { background-color: #34495e; }")
         main_layout.addWidget(main_splitter)
 
+        # Tree widget
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabel(f"PROJECT:{self.current_project.upper()}")
+        self.tree.setHeaderLabel(f"PROJECT: {self.current_project.upper()}")
         self.tree.setStyleSheet("""
-            QHeaderView::section {
-                background-color: lightyellow;
-                color: black;
-                font-size: 20px;
-                font: bold;
-                text-align: center;
-                padding: 2px;
+            QTreeWidget {
+                background-color: #1e2937;
+                color: white;
+                border: none;
+                font-size: 16px;
             }
-            QTreeWidget { background-color: #2c3e50; color: white; border: none; font-size: 20px; font: bold; }
-            QTreeWidget::item { padding: 5px; text-align: center; font-size: 20px; }
-            QTreeWidget::item:hover { background-color: #4a6077; }
-            QTreeWidget::item:selected { background-color: #3498db; }
+            QTreeWidget::item {
+                padding: 8px;
+                border-bottom: 1px solid #34495e;
+            }
+            QTreeWidget::item:hover {
+                background-color: #34495e;
+            }
+            QTreeWidget::item:selected {
+                background-color: #3498db;
+                color: white;
+            }
+            QHeaderView::section {
+                background-color: white;
+                color: black;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 8px;
+                border: none;
+            }
         """)
         header = self.tree.header()
         header.setDefaultAlignment(Qt.AlignCenter)
-        self.tree.setFixedWidth(300)
+        self.tree.setFixedWidth(250)
         self.tree.itemClicked.connect(self.on_tree_item_clicked)
         main_splitter.addWidget(self.tree)
 
+        # Content container
         content_container = QWidget()
         self.content_layout = QVBoxLayout()
+        self.content_layout.setContentsMargins(0, 0, 0, 0)
+        self.content_layout.setSpacing(0)
         content_container.setLayout(self.content_layout)
         content_container.setStyleSheet("background-color: #34495e;")
         main_splitter.addWidget(content_container)
-        main_splitter.setSizes([300, 900])
-        main_splitter.setHandleWidth(0)
+        main_splitter.setSizes([250, 1000])  # Adjusted for better proportion
 
     def update_toolbar(self):
         """Update the navigation toolbar."""
         self.toolbar.clear()
         self.toolbar.setStyleSheet("""
-            QToolBar { background-color: #83afa5; border: none; padding: 10px; spacing: 15px; margin: 0; }
-            QToolBar::separator { width: 1px; margin: 0; }
-            QToolButton { border: none; padding: 8px; border: 1px solid black; margin: 0; border-radius: 5px; background-color: #1e2937; }
-            QToolButton:hover { background-color: #e0e0e0; }
-            QToolButton:pressed { background-color: #d0d0d0; }
-            QToolButton:focus { outline: none; border: 1px solid #0078d7; }
+            QToolBar {
+                background-color: #3e4e75  ;
+                border: none;
+                padding: 5px;
+                spacing: 5px;
+                gap:50px;
+            }
+            QToolButton {
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                background-color: black;
+                margin-bottom:80px   
+            }
+            QToolButton:hover {
+                background-color: #3498db;
+            }
+            QToolButton:pressed {
+                background-color: #2980b9;
+            }
+            QToolButton:focus {
+                outline: none;
+                border: 1px solid #0078d7;
+            }
         """)
-        self.toolbar.setIconSize(QSize(40, 40))
+        self.toolbar.setIconSize(QSize(50, 50))
+        self.toolbar.setContentsMargins(0, 0, 0, 0)
+
         self.toolbar.setMovable(False)
         self.toolbar.setFloatable(False)
 
@@ -176,17 +240,17 @@ class DashboardWindow(QWidget):
                 action.setToolTip(tooltip)
             self.toolbar.addAction(action)
 
-        add_action("New", "icons/new.ico", self.create_project, "Create a New Project")
-        add_action("", "icons/save.ico", self.save_action, "Save Project")
-        add_action("", "icons/refresh.ico", self.refresh_action, "Refresh View")
-        add_action("", "icons/edit.ico", self.edit_project_dialog, "Edit Project Name")
+        add_action("", "icons/new.png", self.create_project, "Create a New Project")
+        add_action("", "icons/save.png", self.save_action, "Save Project")
+        add_action("", "icons/refresh.png", self.refresh_action, "Refresh View")
+        add_action("", "icons/edit.png", self.edit_project_dialog, "Edit Project Name")
 
-        self.play_action = QAction(QIcon("icons/record.ico"), "", self)
+        self.play_action = QAction(QIcon("icons/record.png"), "", self)
         self.play_action.triggered.connect(self.start_saving)
         self.play_action.setToolTip("Start Saving Data (Time View)")
         self.toolbar.addAction(self.play_action)
 
-        self.pause_action = QAction(QIcon("icons/pause.ico"), "", self)
+        self.pause_action = QAction(QIcon("icons/pause.png"), "", self)
         self.pause_action.triggered.connect(self.stop_saving)
         self.pause_action.setToolTip("Stop Saving Data (Time View)")
         self.toolbar.addAction(self.pause_action)
@@ -198,7 +262,7 @@ class DashboardWindow(QWidget):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
-        add_action("Settings", "icons/settings.ico", self.settings_action, "Settings")
+        add_action("", "icons/settings.png", self.settings_action, "Settings")
 
     def load_project_features(self):
         """Load features for the current project into the tree."""
@@ -207,7 +271,6 @@ class DashboardWindow(QWidget):
                 self.db.reconnect()
             self.tree.clear()
             self.add_project_to_tree(self.current_project)
-            # Expand the project item by default
             for i in range(self.tree.topLevelItemCount()):
                 item = self.tree.topLevelItem(i)
                 if item.text(0) == self.current_project:
@@ -225,22 +288,22 @@ class DashboardWindow(QWidget):
         """Add the current project and its features to the tree widget."""
         project_item = QTreeWidgetItem(self.tree)
         project_item.setText(0, project_name)
-        project_item.setIcon(0, QIcon("icons/folder.ico") if os.path.exists("icons/folder.ico") else QIcon())
+        project_item.setIcon(0, QIcon("icons/folder.png") if os.path.exists("icons/folder.png") else QIcon())
         project_item.setData(0, Qt.UserRole, {"type": "project", "name": project_name})
 
         features = [
-            ("Create Tags", "icons/tag.ico"),
-            ("Time View", "icons/time.ico"),
-            ("Tabular View", "icons/table.ico"),
-            ("FFT", "icons/fft.ico"),
-            ("Waterfall", "icons/waterfall.ico"),
-            ("Orbit", "icons/orbit.ico"),
-            ("Trend View", "icons/trend.ico"),
-            ("Multiple Trend View", "icons/multitrend.ico"),
-            ("Bode Plot", "icons/bode.ico"),
-            ("History Plot", "icons/history.ico"),
-            ("Time Report", "icons/report.ico"),
-            ("Report", "icons/report.ico")
+            ("Create Tags", "icons/tag.png"),
+            ("Time View", "icons/time.png"),
+            ("Tabular View", "icons/table.png"),
+            ("FFT", "icons/fft.png"),
+            ("Waterfall", "icons/waterfall.png"),
+            ("Orbit", "icons/orbit.png"),
+            ("Trend View", "icons/trend.png"),
+            ("Multiple Trend View", "icons/multitrend.png"),
+            ("Bode Plot", "icons/bode.png"),
+            ("History Plot", "icons/history.png"),
+            ("Time Report", "icons/report.png"),
+            ("Report", "icons/report.png")
         ]
 
         for feature, icon_path in features:
@@ -264,6 +327,7 @@ class DashboardWindow(QWidget):
         except Exception as e:
             logging.error(f"Error handling tree item click: {str(e)}")
             QMessageBox.warning(self, "Error", f"Error handling tree item click: {str(e)}")
+            
 
     def create_project(self):
         """Create a new project."""
@@ -278,24 +342,21 @@ class DashboardWindow(QWidget):
             QMessageBox QLabel, QInputDialog QLabel {
                 font-size: 16px;
                 color: white;
-                padding: 20px 20px;
+                padding: 10px;
             }
             QMessageBox QPushButton, QInputDialog QPushButton {
                 background-color: #3498db;
                 color: white;
                 border-radius: 5px;
-                padding: 12px 20px;
+                padding: 8px 16px;
                 font-size: 14px;
-                min-width: 250px;
+                min-width: 100px;
             }
             QMessageBox QPushButton:hover, QInputDialog QPushButton:hover {
                 background-color: #2980b9;
             }
             QMessageBox QPushButton:pressed, QInputDialog QPushButton:pressed {
                 background-color: #1abc9c;
-            }
-            QMessageBox QPushButton:focus, QInputDialog QPushButton:focus {
-                border: none;
             }
         """)
         if ok and project_name:
@@ -304,11 +365,10 @@ class DashboardWindow(QWidget):
                     self.db.reconnect()
                 success, message = self.db.create_project(project_name)
                 if success:
-                    # Open a new dashboard window for the new project
                     dashboard = DashboardWindow(self.db, self.email, project_name, self.project_selection_window)
                     dashboard.show()
                     self.project_selection_window.open_dashboards[project_name] = dashboard
-                    self.project_selection_window.load_projects()  # Refresh project list
+                    self.project_selection_window.load_projects()
                     QMessageBox.information(self, "Success", message)
                 else:
                     QMessageBox.warning(self, "Error", message)
@@ -338,10 +398,9 @@ class DashboardWindow(QWidget):
                     self.display_feature_content(self.current_feature, self.current_project)
                 else:
                     self.display_feature_content("Create Tags", self.current_project)
-                # Update the open_dashboards dictionary
                 if old_project_name in self.project_selection_window.open_dashboards:
                     self.project_selection_window.open_dashboards[new_project_name] = self.project_selection_window.open_dashboards.pop(old_project_name)
-                self.project_selection_window.load_projects()  # Refresh project list
+                self.project_selection_window.load_projects()
                 QMessageBox.information(self, "Success", message)
             else:
                 QMessageBox.warning(self, "Error", message)
@@ -361,7 +420,7 @@ class DashboardWindow(QWidget):
                 if success:
                     if self.current_project in self.project_selection_window.open_dashboards:
                         del self.project_selection_window.open_dashboards[self.current_project]
-                    self.project_selection_window.load_projects()  # Refresh project list
+                    self.project_selection_window.load_projects()
                     self.close()
                     QMessageBox.information(self, "Success", message)
                 else:
@@ -505,7 +564,7 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Error refreshing view: {str(e)}")
 
     def display_dashboard(self):
-        """Display the default view for the project."""
+        # """Display the default view for the project."""
         self.current_feature = None
         self.is_saving = False
         self.timer.stop()
@@ -552,7 +611,6 @@ class DashboardWindow(QWidget):
                 self.db.close_connection()
         except Exception as e:
             logging.error(f"Error closing database connection: {str(e)}")
-        # Remove this dashboard from open_dashboards
         if self.current_project in self.project_selection_window.open_dashboards:
             del self.project_selection_window.open_dashboards[self.current_project]
         event.accept()

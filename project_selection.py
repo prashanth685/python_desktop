@@ -71,6 +71,7 @@ class ProjectSelectionWindow(QWidget):
                 padding: 10px;
                 font-size: 25px;
                 min-width: 150px;
+                border-radius:50%;
             }
             QPushButton:hover {
                 background-color: #218838;
@@ -88,6 +89,7 @@ class ProjectSelectionWindow(QWidget):
                 padding: 10px;
                 font-size: 25px;
                 min-width: 150px;
+                border-radius:50px;
             }
             QPushButton:hover {
                 background-color: #0056b3;
@@ -95,6 +97,7 @@ class ProjectSelectionWindow(QWidget):
         """)
         open_button.clicked.connect(self.open_project)
         button_layout.addWidget(open_button)
+        
 
         back_button = QPushButton('Back to Login')
         back_button.setStyleSheet("""
@@ -105,6 +108,7 @@ class ProjectSelectionWindow(QWidget):
                 padding: 10px;
                 font-size: 25px;
                 min-width: 150px;
+                border-radius:50px;
             }
             QPushButton:hover {
                 background-color: #5a6268;

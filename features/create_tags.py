@@ -35,7 +35,7 @@ class CreateTagsFeature:
 
         add_tag_btn = QPushButton("Add Tag")
         add_tag_btn.setStyleSheet("""
-            QPushButton { background-color: #28a745; color: white; border: none; padding: 10px; border-radius: 5px; height: 30px; }
+            QPushButton { background-color: #28a745; color: white; border: none; padding: 15px; border-radius: 50px; height: 30px }
             QPushButton:hover { background-color: #218838; }
         """)
         add_tag_btn.clicked.connect(self.add_tag)
