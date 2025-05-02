@@ -221,9 +221,10 @@ class TimeViewFeature:
                 
             }
             QPushButton:disabled {
-                background-color: #E0E0E0;
-                color: #e0e0e0;
-            }
+            background-color: #E0E0E0;
+            color: red;
+            border: 1px solid #BDBDBD;
+        }
         """)
         self.start_save_button.clicked.connect(self.start_saving)
         

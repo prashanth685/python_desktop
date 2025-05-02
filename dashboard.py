@@ -99,7 +99,7 @@ class DashboardWindow(QWidget):
         self.file_bar = QToolBar("File")
         self.file_bar.setStyleSheet("""
             QToolBar {
-                background-color: #c8cca6;
+                background-color: #eaeaea;
                 border: none;
                 padding: 0;
                 spacing: 5px;
@@ -112,7 +112,7 @@ class DashboardWindow(QWidget):
                 border-radius: 4px;
             }
             QToolBar QToolButton:hover {
-                background-color: #F5F5F5;
+                background-color: #1976D2;
             }
         """)
         self.file_bar.setFixedHeight(40)
@@ -135,20 +135,21 @@ class DashboardWindow(QWidget):
 
         # Navigation toolbar
         self.toolbar = QToolBar("Navigation")
-        self.toolbar.setFixedHeight(80)
-        self.toolbar.setStyleSheet("""
-            QToolBar{
-                background-color: white;
-            }
-        """)
+        self.toolbar.setFixedHeight(75)
         self.update_toolbar()
         main_layout.addWidget(self.toolbar)
+
+        # Subtoolbar for feature access
+        self.subtoolbar = QToolBar("Features")
+        self.subtoolbar.setFixedHeight(60)
+        self.update_subtoolbar()
+        main_layout.addWidget(self.subtoolbar)
 
         # Main splitter for tree and content
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.setContentsMargins(0, 0, 0, 0)
         main_splitter.setHandleWidth(1)
-        main_splitter.setStyleSheet("QSplitter::handle { background-color: #34495e; }")
+        main_splitter.setStyleSheet("QSplitter::handle { background-color: #1e2937; }")
         main_layout.addWidget(main_splitter)
 
         # Tree widget
@@ -193,7 +194,7 @@ class DashboardWindow(QWidget):
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(0)
         content_container.setLayout(self.content_layout)
-        content_container.setStyleSheet("background-color: #34495e;")
+        content_container.setStyleSheet("background-color: #1E1E2F")
         main_splitter.addWidget(content_container)
         main_splitter.setSizes([250, 1000])  # Adjusted for better proportion
 
@@ -202,21 +203,18 @@ class DashboardWindow(QWidget):
         self.toolbar.clear()
         self.toolbar.setStyleSheet("""
             QToolBar {
-                background-color:#0A9396;
+                background-color: #2c3e50;
                 border: none;
                 padding: 5px;
-                spacing: 5px;
-                gap: 50px;
+                spacing: 10px;
             }
             QToolButton {
                 border: none;
-                padding: 6px;
-                border-radius: 4px;
-                background-color: black;
-                font-size: 24px;
-                margin-bottom:20px;
+                padding: 10px;
+                border-radius: 6px;
+                background-color: #34495e;
+                font-size: 28px;
                 color: white;
-                height:250px;
             }
             QToolButton:hover {
                 background-color: #3498db;
@@ -229,8 +227,7 @@ class DashboardWindow(QWidget):
                 border: 1px solid #0078d7;
             }
         """)
-        self.toolbar.setIconSize(QSize(50, 50))
-        self.toolbar.setContentsMargins(0, 0, 0, 0)
+        self.toolbar.setIconSize(QSize(30, 30))
         self.toolbar.setMovable(False)
         self.toolbar.setFloatable(False)
 
@@ -240,17 +237,15 @@ class DashboardWindow(QWidget):
             if tooltip:
                 action.setToolTip(tooltip)
             self.toolbar.addAction(action)
-            # Style the QToolButton for this action
             button = self.toolbar.widgetForAction(action)
             if button:
                 button.setStyleSheet(f"""
                     QToolButton {{
                         color: {color};
-                        font-size: 24px;
+                        font-size: 35px;
                         border: none;
-                        padding: 6px;
-                        border-radius: 4px;
-                        background-color: black;
+                        border-radius: 6px;
+                        background-color: #34495e;
                     }}
                     QToolButton:hover {{
                         background-color: #3498db;
@@ -275,11 +270,11 @@ class DashboardWindow(QWidget):
             play_button.setStyleSheet("""
                 QToolButton {
                     color: #00ff00;
-                    font-size: 24px;
+                    font-size: 35px;
                     border: none;
-                    padding: 6px;
-                    border-radius: 4px;
-                    background-color: black;
+                    padding: 10px;
+                    border-radius: 6px;
+                    background-color: #34495e;
                 }
                 QToolButton:hover {
                     background-color: #3498db;
@@ -298,11 +293,11 @@ class DashboardWindow(QWidget):
             pause_button.setStyleSheet("""
                 QToolButton {
                     color: #ff3333;
-                    font-size: 24px;
+                    font-size: 28px;
                     border: none;
-                    padding: 6px;
-                    border-radius: 4px;
-                    background-color: black;
+                    padding: 10px;
+                    border-radius: 6px;
+                    background-color: #34495e;
                 }
                 QToolButton:hover {
                     background-color: #3498db;
@@ -320,6 +315,79 @@ class DashboardWindow(QWidget):
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
         add_action("", "⚙️", "#999999", self.settings_action, "Settings")
+
+    def update_subtoolbar(self):
+        """Update the subtoolbar with text-based icons for feature access."""
+        self.subtoolbar.clear()
+        self.subtoolbar.setStyleSheet("""
+            QToolBar {
+                background-color: #1e2937;
+                border: none;
+                padding: 5px;
+                spacing: 10px;
+            }
+            QToolButton {
+                border: none;
+                padding: 8px;
+                border-radius: 5px;
+                background-color: #2c3e50;
+                font-size: 24px;
+                color: white;
+            }
+            QToolButton:hover {
+                background-color: #3498db;
+            }
+            QToolButton:pressed {
+                background-color: #2980b9;
+            }
+            QToolButton:focus {
+                outline: none;
+                border: 1px solid #0078d7;
+            }
+        """)
+        self.subtoolbar.setIconSize(QSize(25, 25))
+        self.subtoolbar.setContentsMargins(10, 0, 10, 0)
+        self.subtoolbar.setMovable(False)
+        self.subtoolbar.setFloatable(False)
+
+        def add_feature_action(feature_name, text_icon, color, tooltip):
+            action = QAction(text_icon, self)
+            action.triggered.connect(lambda: self.display_feature_content(feature_name, self.current_project))
+            action.setToolTip(tooltip)
+            self.subtoolbar.addAction(action)
+            button = self.subtoolbar.widgetForAction(action)
+            if button:
+                button.setStyleSheet(f"""
+                    QToolButton {{
+                        color: {color};
+                        font-size: 28px;
+                        border: none;
+                        padding: 8px;
+                        border-radius: 5px;
+                        background-color: #2c3e50;
+                    }}
+                    QToolButton:hover {{
+                        background-color: #3498db;
+                    }}
+                    QToolButton:pressed {{
+                        background-color: #2980b9;
+                    }}
+                """)
+
+        # Define feature actions with text icons and colors
+        feature_actions = [
+            ("Create Tags", "🏷️", "#00cc00", "Access Create Tags Feature"),
+            ("Time View", "⏱️", "#ff9900", "Access Time View Feature"),
+            ("Tabular View", "📋", "#3399ff", "Access Tabular View Feature"),
+            ("Time Report", "📄", "#cc33ff", "Access Time Report Feature"),
+        ]
+
+        for feature_name, text_icon, color, tooltip in feature_actions:
+            add_feature_action(feature_name, text_icon, color, tooltip)
+
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.subtoolbar.addWidget(spacer)
 
     def load_project_features(self):
         """Load features for the current project into the tree."""
@@ -423,6 +491,7 @@ class DashboardWindow(QWidget):
                     dashboard.show()
                     self.project_selection_window.open_dashboards[project_name] = dashboard
                     self.project_selection_window.load_projects()
+                    self.update_subtoolbar()
                     QMessageBox.information(self, "Success", message)
                 else:
                     QMessageBox.warning(self, "Error", message)
@@ -448,6 +517,7 @@ class DashboardWindow(QWidget):
                 self.load_project_features()
                 self.setup_mqtt()
                 self.update_toolbar()
+                self.update_subtoolbar()
                 if self.current_feature:
                     self.display_feature_content(self.current_feature, self.current_project)
                 else:
@@ -532,6 +602,7 @@ class DashboardWindow(QWidget):
         self.current_feature = feature_name
         self.is_saving = False
         self.update_toolbar()
+        self.update_subtoolbar()
         self.clear_content_layout()
 
         feature_instance = self.feature_instances.get(feature_name)
@@ -553,15 +624,7 @@ class DashboardWindow(QWidget):
             "Create Tags": CreateTagsFeature,
             "Tabular View": TabularViewFeature,
             "Time View": TimeViewFeature,
-            # "FFT": FFTViewFeature,
-            # "Waterfall": WaterfallFeature,
-            # "Orbit": OrbitFeature,
-            # "Trend View": TrendViewFeature,
-            # "Multiple Trend View": MultiTrendFeature,
-            # "Bode Plot": BodePlotFeature,
-            # "History Plot": HistoryPlotFeature,
             "Time Report": TimeReportFeature,
-            # "Report": ReportFeature
         }
 
         if feature_name in feature_classes:
@@ -623,6 +686,7 @@ class DashboardWindow(QWidget):
         self.is_saving = False
         self.timer.stop()
         self.update_toolbar()
+        self.update_subtoolbar()
         self.clear_content_layout()
         self.display_feature_content("Create Tags", self.current_project)
 
@@ -650,21 +714,73 @@ class DashboardWindow(QWidget):
         QMessageBox.information(self, "Settings", "Settings functionality not implemented yet.")
 
     def closeEvent(self, event):
-        """Handle window close event."""
-        self.timer.stop()
-        if self.mqtt_handler:
-            try:
-                self.mqtt_handler.stop()
-                self.mqtt_handler.deleteLater()
-                logging.info("MQTT handler stopped on close")
-            except Exception as e:
-                logging.error(f"Error stopping MQTT handler on close: {str(e)}")
-        self.clear_content_layout()
+        """Handle window close event to terminate the entire application."""
+        logging.debug("DashboardWindow closeEvent triggered")
         try:
-            if self.db.is_connected():
-                self.db.close_connection()
+            # Stop the timer
+            if self.timer.isActive():
+                self.timer.stop()
+                logging.debug("Timer stopped")
+
+            # Stop MQTT handler
+            if self.mqtt_handler:
+                try:
+                    self.mqtt_handler.stop()
+                    self.mqtt_handler.deleteLater()
+                    logging.info("MQTT handler stopped and deleted")
+                except Exception as e:
+                    logging.error(f"Error stopping MQTT handler: {str(e)}")
+                self.mqtt_handler = None
+
+            # Clear content layout and feature instances
+            self.clear_content_layout()
+            logging.debug("Content layout cleared")
+
+            # Close database connection
+            if self.db and self.db.is_connected():
+                try:
+                    self.db.close_connection()
+                    logging.info("Database connection closed")
+                except Exception as e:
+                    logging.error(f"Error closing database connection: {str(e)}")
+
+            # Remove this dashboard from open_dashboards
+            if self.project_selection_window and self.current_project in self.project_selection_window.open_dashboards:
+                del self.project_selection_window.open_dashboards[self.current_project]
+                logging.debug(f"Removed {self.current_project} from open_dashboards")
+
+            # Close all other open dashboards
+            if self.project_selection_window:
+                for project_name, dashboard in list(self.project_selection_window.open_dashboards.items()):
+                    try:
+                        if dashboard.isVisible():
+                            dashboard.close()
+                            logging.debug(f"Closed dashboard for {project_name}")
+                        del self.project_selection_window.open_dashboards[project_name]
+                    except Exception as e:
+                        logging.error(f"Error closing dashboard for {project_name}: {str(e)}")
+
+            # Close the project selection window
+            if self.project_selection_window and self.project_selection_window.isVisible():
+                try:
+                    self.project_selection_window.close()
+                    logging.debug("Project selection window closed")
+                except Exception as e:
+                    logging.error(f"Error closing project selection window: {str(e)}")
+
+            # Ensure all events are processed before quitting
+            QCoreApplication.processEvents()
+
+            # Terminate the application
+            app = QApplication.instance()
+            if app:
+                app.quit()
+                logging.info("Application quit initiated")
+            else:
+                logging.warning("No QApplication instance found")
+
         except Exception as e:
-            logging.error(f"Error closing database connection: {str(e)}")
-        if self.current_project in self.project_selection_window.open_dashboards:
-            del self.project_selection_window.open_dashboards[self.current_project]
-        event.accept()
+            logging.error(f"Error during closeEvent: {str(e)}")
+        finally:
+            event.accept()
+            logging.debug("closeEvent accepted")

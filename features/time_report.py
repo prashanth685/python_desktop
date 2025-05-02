@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QTextEdit, QScrollArea, QDateTimeEdit)
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QTextEdit, QScrollArea, QDateTimeEdit, QGridLayout)
 from PyQt5.QtCore import Qt, QDateTime, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -138,7 +138,7 @@ class TimeReportFeature:
         # File selection
         file_layout = QHBoxLayout()
         file_label = QLabel("Select Saved File:")
-        file_label.setStyleSheet("color: white; font-size: 16px;")
+        file_label.setStyleSheet("color: white; font-size: 16px;font:bold")
         self.file_combo = QComboBox()
         self.file_combo.setStyleSheet("""QComboBox {
             background-color: #fdfdfd;
@@ -202,17 +202,17 @@ class TimeReportFeature:
         # Time range selection
         time_range_layout = QHBoxLayout()
         start_time_label = QLabel("Select Start Time:")
-        start_time_label.setStyleSheet("color: white; font-size: 16px;")
+        start_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
         self.start_time_edit = QDateTimeEdit()
-        self.start_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 1px solid #1a73e8; padding: 15px;")
+        self.start_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold")
         self.start_time_edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
         self.start_time_edit.setCalendarPopup(True)
         self.start_time_edit.dateTimeChanged.connect(self.validate_time_range)
 
         end_time_label = QLabel("Select End Time:")
-        end_time_label.setStyleSheet("color: white; font-size: 16px;")
+        end_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
         self.end_time_edit = QDateTimeEdit()
-        self.end_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 1px solid #1a73e8; padding: 15px;")
+        self.end_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold")
         self.end_time_edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
         self.end_time_edit.setCalendarPopup(True)
         self.end_time_edit.dateTimeChanged.connect(self.validate_time_range)
@@ -224,23 +224,24 @@ class TimeReportFeature:
         time_range_layout.addStretch()
         self.report_layout.addLayout(time_range_layout)
 
-        # Dual time range slider
-        slider_layout = QHBoxLayout()
+        # Dual time range slider with fixed label
+        slider_layout = QGridLayout()
         slider_label = QLabel("Drag Time Range:")
-        slider_label.setStyleSheet("color: white; font-size: 16px;")
+        slider_label.setStyleSheet("color: white; font-size: 14px;font:bold")
+        slider_label.setFixedWidth(150)  # Fixed width to prevent movement
         self.time_slider = QRangeSlider(self.widget)
         self.time_slider.valueChanged.connect(self.update_time_from_slider)
-        slider_layout.addWidget(slider_label)
-        slider_layout.addWidget(self.time_slider)
-        slider_layout.addStretch()
+        slider_layout.addWidget(slider_label, 0, 0, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
+        slider_layout.addWidget(self.time_slider, 0, 1, 1, 1)
+        slider_layout.setColumnStretch(1, 1)  # Allow slider to expand, keep label fixed
         self.report_layout.addLayout(slider_layout)
 
         # Time labels
         time_info_layout = QHBoxLayout()
         self.start_time_label = QLabel("File Start Time: N/A")
-        self.start_time_label.setStyleSheet("color: white; font-size: 16px;")
+        self.start_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
         self.stop_time_label = QLabel("File Stop Time: N/A")
-        self.stop_time_label.setStyleSheet("color: white; font-size: 16px;")
+        self.stop_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
         time_info_layout.addWidget(self.start_time_label)
         time_info_layout.addWidget(self.stop_time_label)
         time_info_layout.addStretch()
@@ -370,7 +371,7 @@ class TimeReportFeature:
                 self.file_end_time = None
         except Exception as e:
             logging.error(f"Error updating time labels for {filename}: {e}")
-            self.start_time_label.setText("File Start Time: N/A")
+            self.start_time_label.setText("File sediartTime: N/A")
             self.stop_time_label.setText("File Stop Time: N/A")
             self.start_time_edit.setEnabled(False)
             self.end_time_edit.setEnabled(False)
@@ -535,7 +536,7 @@ class TimeReportFeature:
             # Formatter for x-axis to display hh:mm:sss
             def time_formatter(x, pos):
                 actual_time = start_time + timedelta(seconds=x)
-                return actual_time.strftime('%H:%M:%S') + '\n' + actual_time.strftime('%d-%m-%Y')
+                return actual_time.strftime('%H:%M:%S %f')[:-3] + '\n' + actual_time.strftime('%d-%m-%Y')
 
             for channel in range(num_channels):
                 ax = self.figure.add_subplot(num_channels, 1, channel + 1)

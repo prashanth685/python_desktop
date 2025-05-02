@@ -31,13 +31,37 @@ class CreateTagsFeature:
         add_tag_form = QHBoxLayout()
         self.tag_name_input = QLineEdit()
         self.tag_name_input.setPlaceholderText("Enter full tag (e.g., sarayu/tag1/topic1|m/s)")
-        self.tag_name_input.setStyleSheet("background-color: #34495e; color: white; border: 1px solid #1a73e8; padding: 10px; height: 30px;width:50%;font-size:15px")
+        # self.tag_name_input.setStyleSheet("background-color: #34495e; color: white; border: 1px solid #1a73e8; padding: 10px; height: 30px;width:50%;font-size:15px")
+        self.tag_name_input.setStyleSheet("""
+    QLineEdit {
+        background-color: #2d3436;
+        color: white;
+        border: 2px solid #1a73e8;
+        padding: 10px;
+        font-size: 14px;
+        border-radius: 10px;
+    }
+    QLineEdit:focus {
+        border: 2px solid #00cec9;
+        background-color: #1e272e;
+    }
+""")
+
 
         add_tag_btn = QPushButton("Add Tag")
         add_tag_btn.setStyleSheet("""
-            QPushButton { background-color: #28a745; color: white; border: none; padding: 15px; border-radius: 50px; height: 30px }
-            QPushButton:hover { background-color: #218838; }
+            QPushButton {
+                background-color: #27ae60;
+                color: white;
+                padding: 10px 25px;
+                border-radius: 20px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #2ecc71;
+            }
         """)
+
         add_tag_btn.clicked.connect(self.add_tag)
 
         add_tag_form.addWidget(self.tag_name_input)
