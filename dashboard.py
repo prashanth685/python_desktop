@@ -279,9 +279,14 @@ class DashboardWindow(QWidget):
                 QToolButton:hover {
                     background-color: #3498db;
                 }
+                QToolButton::disabled {
+                    background-color: black;
+                }
+                
                 QToolButton:pressed {
                     background-color: #2980b9;
                 }
+
             """)
 
         self.pause_action = QAction("⏸️", self)
@@ -302,6 +307,11 @@ class DashboardWindow(QWidget):
                 QToolButton:hover {
                     background-color: #3498db;
                 }
+                
+                QToolButton::disabled {
+                    background-color: black;
+                }
+                
                 QToolButton:pressed {
                     background-color: #2980b9;
                 }
