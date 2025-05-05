@@ -270,7 +270,32 @@ class TimeViewFeature:
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.time_widget)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("background-color: black; border: none;color:black")
+        scroll_area.setStyleSheet("""QScrollArea {
+                border-radius: 8px;
+                padding: 5px;
+            }
+
+            QScrollBar:vertical {
+                background: white;
+                width: 10px;
+                margin: 0px;
+                border-radius: 5px;
+            }
+
+            QScrollBar::handle:vertical {
+                background: black;
+                border-radius: 5px;
+            }
+
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
         scroll_area.setMaximumHeight(4000)
         layout.addWidget(scroll_area)
 

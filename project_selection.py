@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-                             QComboBox, QMessageBox, QApplication, QInputDialog)
+                             QComboBox, QMessageBox, QApplication, QInputDialog, QDialog, QListWidget, QDialogButtonBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 import os
@@ -9,6 +9,71 @@ from database import Database
 import logging
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class ProjectSelectionDialog(QDialog):
+    def __init__(self, projects, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Select Existing Project")
+        self.setStyleSheet("background-color: #ffffff;")
+        self.selected_project = None
+        
+        layout = QVBoxLayout()
+        
+        # Project list
+        self.project_list = QListWidget()
+        self.project_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #ced4da;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 16px;
+                background-color: #f8f9fa;
+                min-width: 300px;
+                min-height: 200px;
+            }
+            QListWidget::item:selected {
+                background-color: #007bff;
+                color: white;
+            }
+        """)
+        for project in projects:
+            self.project_list.addItem(project)
+        self.project_list.itemDoubleClicked.connect(self.accept)
+        layout.addWidget(self.project_list)
+        
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                color: white;
+                border-radius: 8px;
+                padding: 10px;
+                font-size: 16px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+            QPushButton:cancel {
+                background-color: #6c757d;
+            }
+            QPushButton:cancel:hover {
+                background-color: #5a6268;
+            }
+        """)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        
+        self.setLayout(layout)
+        self.setMinimumSize(400, 300)
+        
+    def accept(self):
+        selected_items = self.project_list.selectedItems()
+        if selected_items:
+            self.selected_project = selected_items[0].text()
+        super().accept()
 
 class ProjectSelectionWindow(QWidget):
     def __init__(self, db, email, auth_window):
@@ -133,6 +198,25 @@ class ProjectSelectionWindow(QWidget):
         """)
         open_button.clicked.connect(self.open_project)
         button_layout.addWidget(open_button)
+
+        # Open Existing Project button
+        existing_button = QPushButton('Open Existing Project')
+        existing_button.setStyleSheet("""
+            QPushButton {
+                background-color: #17a2b8;
+                color: white;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 16px;
+                min-width: 120px;
+            }
+            QPushButton:hover {
+                background-color: #138496;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+        """)
+        existing_button.clicked.connect(self.open_existing_project)
+        button_layout.addWidget(existing_button)
 
         # Back to Login button
         back_button = QPushButton('Back to Login')
@@ -376,6 +460,91 @@ class ProjectSelectionWindow(QWidget):
             msg_box = QMessageBox(self)
             msg_box.setWindowTitle("Error")
             msg_box.setText(f"Failed to open dashboard: {str(e)}")
+            msg_box.setStyleSheet("""
+                background-color: #ffffff;
+                font: 12pt 'Arial';
+                QLabel {
+                    color: #343a40;
+                }
+                QPushButton {
+                    background-color: #dc3545;
+                    color: white;
+                    border-radius: 5px;
+                    padding: 8px;
+                    min-width: 80px;
+                }
+                QPushButton:hover {
+                    background-color: #c82333;
+                }
+            """)
+            msg_box.exec_()
+
+    def open_existing_project(self):
+        """Open a dialog to select and open an existing project."""
+        try:
+            if not self.db.projects:
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle("No Projects")
+                msg_box.setText("No projects available to open!")
+                msg_box.setStyleSheet("""
+                    background-color: #ffffff;
+                    font: 12pt 'Arial';
+                    QLabel {
+                        color: #343a40;
+                    }
+                    QPushButton {
+                        background-color: #dc3545;
+                        color: white;
+                        border-radius: 5px;
+                        padding: 8px;
+                        min-width: 80px;
+                    }
+                    QPushButton:hover {
+                        background-color: #c82333;
+                    }
+                """)
+                msg_box.exec_()
+                return
+                
+            dialog = ProjectSelectionDialog(self.db.projects, self)
+            if dialog.exec_() and dialog.selected_project:
+                project_name = dialog.selected_project
+                if project_name in self.open_dashboards and self.open_dashboards[project_name].isVisible():
+                    msg_box = QMessageBox(self)
+                    msg_box.setWindowTitle("Info")
+                    msg_box.setText(f"Project '{project_name}' is already open!")
+                    msg_box.setStyleSheet("""
+                        background-color: #ffffff;
+                        font: 12pt 'Arial';
+                        QLabel {
+                            color: #343a40;
+                        }
+                        QPushButton {
+                            background-color: #007bff;
+                            color: white;
+                            border-radius: 5px;
+                            padding: 8px;
+                            min-width: 80px;
+                        }
+                        QPushButton:hover {
+                            background-color: #0056b3;
+                        }
+                    """)
+                    msg_box.exec_()
+                    self.open_dashboards[project_name].raise_()
+                    self.open_dashboards[project_name].activateWindow()
+                    return
+
+                logging.info(f"Opening existing project: {project_name}")
+                dashboard = DashboardWindow(self.db, self.email, project_name, self)
+                dashboard.show()
+                self.open_dashboards[project_name] = dashboard
+                self.project_combo.setCurrentText(project_name)
+        except Exception as e:
+            logging.error(f"Error opening existing project: {str(e)}")
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Error")
+            msg_box.setText(f"Failed to open project: {str(e)}")
             msg_box.setStyleSheet("""
                 background-color: #ffffff;
                 font: 12pt 'Arial';

@@ -20,7 +20,7 @@ from features.time_report import TimeReportFeature
 from features.report import ReportFeature
 import logging
 
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class DashboardWindow(QWidget):
     def __init__(self, db, email, project_name, project_selection_window):
@@ -286,7 +286,6 @@ class DashboardWindow(QWidget):
                 QToolButton:pressed {
                     background-color: #2980b9;
                 }
-
             """)
 
         self.pause_action = QAction("⏸️", self)
@@ -384,12 +383,20 @@ class DashboardWindow(QWidget):
                     }}
                 """)
 
-        # Define feature actions with text icons and colors
+        # Define feature actions with text icons and colors, matching the tree widget features
         feature_actions = [
             ("Create Tags", "🏷️", "#00cc00", "Access Create Tags Feature"),
             ("Time View", "⏱️", "#ff9900", "Access Time View Feature"),
             ("Tabular View", "📋", "#3399ff", "Access Tabular View Feature"),
-            ("Time Report", "📄", "#cc33ff", "Access Time Report Feature"),
+            ("FFT", "📈", "#cc33ff", "Access FFT View Feature"),
+            ("Waterfall", "🌊", "#00cccc", "Access Waterfall Feature"),
+            ("Orbit", "🪐", "#ff66cc", "Access Orbit Feature"),
+            ("Trend View", "📉", "#66cc00", "Access Trend View Feature"),
+            ("Multiple Trend View", "📊", "#cc6600", "Access Multiple Trend View Feature"),
+            ("Bode Plot", "🔍", "#6666ff", "Access Bode Plot Feature"),
+            ("History Plot", "🕰️", "#ff3333", "Access History Plot Feature"),
+            ("Time Report", "📄", "#33cc99", "Access Time Report Feature"),
+            ("Report", "📝", "#9933cc", "Access Report Feature"),
         ]
 
         for feature_name, text_icon, color, tooltip in feature_actions:
@@ -635,6 +642,14 @@ class DashboardWindow(QWidget):
             "Tabular View": TabularViewFeature,
             "Time View": TimeViewFeature,
             "Time Report": TimeReportFeature,
+            # "FFT": FFTViewFeature,
+            # "Waterfall": WaterfallFeature,
+            # "Orbit": OrbitFeature,
+            # "Trend View": TrendViewFeature,
+            # "Multiple Trend View": MultiTrendFeature,
+            # "Bode Plot": BodePlotFeature,
+            # "History Plot": HistoryPlotFeature,
+            # "Report": ReportFeature
         }
 
         if feature_name in feature_classes:

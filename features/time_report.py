@@ -256,12 +256,49 @@ class TimeReportFeature:
         self.report_layout.addWidget(self.result_text)
         self.report_layout.addStretch()
 
+        # scroll_area = QScrollArea()
+        # scroll_area.setWidget(self.report_widget)
+        # scroll_area.setWidgetResizable(True)
+        # scroll_area.setStyleSheet("background-color: black; border: none;")
+        # scroll_area.setMaximumHeight(4000)
+        # layout.addWidget(scroll_area)
+
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.report_widget)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("background-color: black; border: none;")
         scroll_area.setMaximumHeight(4000)
+
+        # Style for the scroll area
+        scroll_area.setStyleSheet("""
+            QScrollArea {
+                border-radius: 8px;
+                padding: 5px;
+            }
+
+            QScrollBar:vertical {
+                background: white;
+                width: 10px;
+                margin: 0px;
+                border-radius: 5px;
+            }
+
+            QScrollBar::handle:vertical {
+                background: black;
+                border-radius: 5px;
+            }
+
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+
         layout.addWidget(scroll_area)
+
 
         self.refresh_filenames()
 
@@ -518,7 +555,7 @@ class TimeReportFeature:
 
             def time_formatter(x, pos):
                 actual_time = start_time + timedelta(seconds=x)
-                return actual_time.strftime('%H:%M:%S %f')[:-3] + '\n' + actual_time.strftime('%d-%m-%Y')
+                return actual_time.strftime('%H:%M:%S:%f')[:-3] + '\n' + actual_time.strftime('%d-%m-%Y')
 
             for channel in range(num_channels):
                 ax = self.figure.add_subplot(num_channels, 1, channel + 1)
