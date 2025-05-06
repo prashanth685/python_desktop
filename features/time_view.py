@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout, QComboBox, QTextEdit, 
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout, QComboBox, 
                             QScrollArea, QPushButton, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -8,8 +8,6 @@ from datetime import datetime, timedelta
 from collections import deque
 import logging
 import re
-
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class TimeViewFeature:
     def __init__(self, parent, db, project_name):
@@ -37,6 +35,9 @@ class TimeViewFeature:
         self.save_timer = QTimer(self.widget)
         self.save_timer.timeout.connect(self.update_save_duration)
         self.initUI()
+        
+    def get_widget(self):
+        return self.widget
 
     def get_next_filename_counter(self):
         filenames = self.db.get_distinct_filenames(self.project_name)
@@ -151,7 +152,8 @@ class TimeViewFeature:
             padding-bottom: 4px;
         """)
         self.filename_combo = QComboBox()
-        self.filename_combo.setStyleSheet("""QComboBox {
+        self.filename_combo.setStyleSheet("""
+    QComboBox {
         background-color: #fdfdfd;
         color: #212121;
         border: 2px solid #90caf9;
@@ -260,17 +262,11 @@ class TimeViewFeature:
 
         self.time_layout.addWidget(self.canvas)
 
-        self.time_result = QTextEdit()
-        self.time_result.setReadOnly(True)
-        self.time_result.setStyleSheet("background-color: #34495e; color: white; border-radius: 5px; padding: 10px;")
-        self.time_result.setMinimumHeight(100)
-        self.time_layout.addWidget(self.time_result)
-        self.time_layout.addStretch()
-
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.time_widget)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setStyleSheet("""QScrollArea {
+        scroll_area.setStyleSheet("""
+            QScrollArea {
                 border-radius: 8px;
                 padding: 5px;
             }
@@ -337,7 +333,7 @@ class TimeViewFeature:
 
     def start_saving(self):
         if not self.mqtt_tag or self.mqtt_tag == "No Tags Available":
-            self.time_result.setText("Error: Please select a valid tag!")
+            self.parent.append_to_console("Error: Please select a valid tag!")
             QMessageBox.warning(self.widget, "Error", "Please select a valid tag!")
             return
         
@@ -345,33 +341,30 @@ class TimeViewFeature:
         self.is_saving = True
         self.frame_index = 0
         self.save_start_time = datetime.now()
-        self.start_save_button.setEnabled(False)  # Disable button
+        self.start_save_button.setEnabled(False)
         self.stop_save_button.setEnabled(True)
         self.save_timer.start(1000)
         self.parent.is_saving = True
-        self.parent.play_action.setEnabled(False)
-        self.parent.pause_action.setEnabled(True)
         start_time_str = self.save_start_time.strftime("%H:%M:%S")
         self.start_time_label.setText(f"Start Time: {start_time_str}")
         self.end_time_label.setText(f"End Time: {start_time_str}")
         if hasattr(self, 'latest_filename_label'):
             self.latest_filename_label.setText(f"Latest File: {filename}")
         logging.info(f"Started saving data for {self.mqtt_tag} with filename {filename}")
+        self.parent.append_to_console(f"Started saving data for {self.mqtt_tag} with filename {filename}")
 
     def stop_saving(self):
         if not self.is_saving:
             return
         
         self.is_saving = False
-        self.start_save_button.setEnabled(True)  # Re-enable button
+        self.start_save_button.setEnabled(True)
         self.stop_save_button.setEnabled(False)
         self.save_timer.stop()
         stop_time = datetime.now()
         self.save_end_time = stop_time
         duration = stop_time - self.save_start_time if self.save_start_time else timedelta(0)
         self.parent.is_saving = False
-        self.parent.play_action.setEnabled(True)
-        self.parent.pause_action.setEnabled(False)
         filename = f"data{self.filename_counter}"
         self.filename_counter += 1
         start_time_str = self.save_start_time.strftime("%H:%M:%S") if self.save_start_time else "N/A"
@@ -382,12 +375,14 @@ class TimeViewFeature:
         if hasattr(self, 'latest_filename_label'):
             self.latest_filename_label.setText(f"Latest File: data{self.filename_counter}")
         logging.info(f"Stopped saving data for {self.mqtt_tag}")
+        self.parent.append_to_console(f"Stopped saving data for {self.mqtt_tag}")
         self.save_start_time = None
         self.refresh_filenames()
 
     def setup_time_view_plot(self, tag_name):
         if not self.project_name or not tag_name or tag_name == "No Tags Available":
             logging.warning("No project or valid tag selected for Time View!")
+            self.parent.append_to_console("No project or valid tag selected for Time View!")
             self.timer.stop()
             self.figure.clear()
             self.canvas.draw()
@@ -414,13 +409,12 @@ class TimeViewFeature:
             self.latest_filename_label.setText(f"Saving File: data{self.filename_counter}")
         self.frame_index = 0
         self.parent.is_saving = False
-        self.parent.play_action.setEnabled(True)
-        self.parent.pause_action.setEnabled(False)
 
         self.figure.clear()
         self.canvas.draw()
         self.timer.start()
         logging.info(f"Initialized plot setup for tag {self.mqtt_tag}, buffer size: {self.buffer_size}")
+        self.parent.append_to_console(f"Initialized plot setup for tag {self.mqtt_tag}")
 
     def initialize_plot(self, num_channels):
         if num_channels == self.num_channels and self.axes:
@@ -453,11 +447,13 @@ class TimeViewFeature:
         self.time_widget.setMinimumSize(1000, 1300)
         self.canvas.draw()
         logging.info(f"Initialized {num_channels} subplots for tag {self.mqtt_tag}")
+        self.parent.append_to_console(f"Initialized {num_channels} subplots for tag {self.mqtt_tag}")
 
     def split_and_store_values(self, values, timestamp):
         try:
             if len(values) < 10:
                 logging.warning(f"Insufficient data: received {len(values)} values, expected at least 10")
+                self.parent.append_to_console(f"Insufficient data: received {len(values)} values")
                 return
 
             frame_index = values[0] + (values[1] * 65535)
@@ -473,6 +469,7 @@ class TimeViewFeature:
             plot_values = values[10:]
             if len(plot_values) % number_of_channels != 0:
                 logging.warning(f"Unexpected number of plot values: {len(plot_values)}. Expected multiple of {number_of_channels}")
+                self.parent.append_to_console(f"Unexpected number of plot values: {len(plot_values)}")
                 return
 
             if number_of_channels != self.num_channels or not self.axes:
@@ -491,7 +488,7 @@ class TimeViewFeature:
                     self.time_view_timestamps.append(timestamps[sample_idx])
                 except (ValueError, TypeError) as e:
                     logging.warning(f"Invalid sample at index {i}: {e}")
-                    self.time_result.append(f"Warning: Invalid sample data at index {i}")
+                    self.parent.append_to_console(f"Warning: Invalid sample data at index {i}")
                     continue
 
             if self.is_saving:
@@ -517,9 +514,10 @@ class TimeViewFeature:
                     self.frame_index += 1
                     self.header.setText(f"TIME VIEW FOR {self.project_name.upper()}")
                     logging.debug(f"Saved frame {self.frame_index - 1} for {self.mqtt_tag} to {filename}")
-                    self.time_result.append(f"Saved frame {self.frame_index - 1} to {filename}")
+                    self.parent.append_to_console(f"Saved frame {self.frame_index - 1} to {filename}")
                 else:
                     logging.error(f"Failed to save data: {msg}")
+                    self.parent.append_to_console(f"Failed to save data: {msg}")
                     self.is_saving = False
                     self.start_save_button.setEnabled(True)
                     self.stop_save_button.setEnabled(False)
@@ -529,9 +527,9 @@ class TimeViewFeature:
                     self.timer_label.setText("Save Duration: 00:00:00")
                     QMessageBox.critical(self.widget, "Error", f"Failed to save data: {msg}")
 
-            # logging.debug(f"Stored {num_samples} samples for {number_of_channels} channels")
         except Exception as e:
             logging.error(f"Error processing values: {e}")
+            self.parent.append_to_console(f"Error processing values: {e}")
 
     def adjust_buffer_size(self):
         new_buffer_size = int(self.data_rate * self.window_size)
@@ -540,6 +538,7 @@ class TimeViewFeature:
             self.time_view_buffers = [deque(buf, maxlen=self.buffer_size) for buf in self.time_view_buffers]
             self.time_view_timestamps = deque(self.time_view_timestamps, maxlen=self.buffer_size)
             logging.info(f"Adjusted buffer size to {self.buffer_size}")
+            self.parent.append_to_console(f"Adjusted buffer size to {self.buffer_size}")
             for ax in self.axes:
                 ax.set_xlim(0, self.window_size)
                 ax.set_xticks(np.linspace(0, self.window_size, 11))
@@ -598,7 +597,7 @@ class TimeViewFeature:
                         ax.set_xticklabels(time_labels, rotation=0, ha='left', fontsize=10)
                 except Exception as e:
                     logging.error(f"Error setting x-ticks: {e}")
-                    self.time_result.append(f"Error setting x-ticks: {str(e)}")
+                    self.parent.append_to_console(f"Error setting x-ticks: {str(e)}")
 
         self.canvas.draw()
 
@@ -609,7 +608,4 @@ class TimeViewFeature:
         current_time = datetime.now()
         timestamp = current_time.isoformat()
         self.split_and_store_values(values, timestamp)
-        # logging.debug(f"Received {len(values)} values for {tag_name}")
 
-    def get_widget(self):
-        return self.widget

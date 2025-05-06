@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QTextEdit, QScrollArea, QDateTimeEdit, QGridLayout)
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QScrollArea, QDateTimeEdit, QGridLayout)
 from PyQt5.QtCore import Qt, QDateTime, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -8,8 +8,6 @@ import numpy as np
 from datetime import datetime, timedelta
 import logging
 import re
-
-# logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class QRangeSlider(QWidget):
     """Custom dual slider widget for selecting a time range."""
@@ -48,20 +46,17 @@ class QRangeSlider(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        # Groove
         groove_rect = QRect(int(10), int(10), int(self.width() - 20), int(8))
         painter.setPen(QPen(QColor("#1a73e8")))
         painter.setBrush(QColor("#34495e"))
         painter.drawRoundedRect(groove_rect, 4, 4)
 
-        # Selected range
         left_pos = int(self._value_to_pos(self.left_value))
         right_pos = int(self._value_to_pos(self.right_value))
         selected_rect = QRect(left_pos, int(10), int(right_pos - left_pos), int(8))
         painter.setBrush(QColor("#90caf9"))
         painter.drawRoundedRect(selected_rect, 4, 4)
 
-        # Handles
         painter.setPen(QPen(QColor("#1a73e8")))
         painter.setBrush(QColor("#42a5f5" if self.dragging == 'left' else "#1a73e8"))
         painter.drawEllipse(left_pos - 9, 6, 18, 18)
@@ -132,57 +127,57 @@ class TimeReportFeature:
         self.report_widget.setLayout(self.report_layout)
         self.report_widget.setStyleSheet("background-color: #2c3e50; border-radius: 5px; padding: 10px;")
 
-        # File selection
         file_layout = QHBoxLayout()
         file_label = QLabel("Select Saved File:")
         file_label.setStyleSheet("color: white; font-size: 16px;font:bold")
         self.file_combo = QComboBox()
-        self.file_combo.setStyleSheet("""QComboBox {
-            background-color: #fdfdfd;
-            color: #212121;
-            border: 2px solid #90caf9;
-            border-radius: 8px;
-            padding: 10px 40px 10px 14px;
-            font-size: 16px;
-            font-weight: 600;
-            min-width: 220px;
-            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
-        }
-        QComboBox:hover {
-            border: 2px solid #42a5f5;
-            background-color: #f5faff;
-        }
-        QComboBox:focus {
-            border: 2px solid #1e88e5;
-            background-color: #ffffff;
-        }
-        QComboBox::drop-down {
-            subcontrol-origin: padding;
-            subcontrol-position: top right;
-            width: 36px;
-            border-left: 1px solid #e0e0e0;
-            background-color: #e3f2fd;
-            border-top-right-radius: 8px;
-            border-bottom-right-radius: 8px;
-        }
-        QComboBox QAbstractItemView {
-            background-color: #ffffff;
-            border: 1px solid #90caf9;
-            border-radius: 4px;
-            padding: 5px;
-            selection-background-color: #e3f2fd;
-            selection-color: #0d47a1;
-            font-size: 15px;
-            outline: 0;
-        }
-        QComboBox::item {
-            padding: 10px 8px;
-            border: none;
-        }
-        QComboBox::item:selected {
-            background-color: #bbdefb;
-            color: #0d47a1;
-        }""")
+        self.file_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #fdfdfd;
+                color: #212121;
+                border: 2px solid #90caf9;
+                border-radius: 8px;
+                padding: 10px 40px 10px 14px;
+                font-size: 16px;
+                font-weight: 600;
+                min-width: 220px;
+                box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
+            }
+            QComboBox:hover {
+                border: 2px solid #42a5f5;
+                background-color: #f5faff;
+            }
+            QComboBox:focus {
+                border: 2px solid #1e88e5;
+                background-color: #ffffff;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 36px;
+                border-left: 1px solid #e0e0e0;
+                background-color: #e3f2fd;
+                border-top-right-radius: 8px;
+                border-bottom-right-radius: 8px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                border: 1px solid #90caf9;
+                border-radius: 4px;
+                padding: 5px;
+                selection-background-color: #e3f2fd;
+                selection-color: #0d47a1;
+                font-size: 15px;
+                outline: 0;
+            }
+            QComboBox::item {
+                padding: 10px 8px;
+                border: none;
+            }
+            QComboBox::item:selected {
+                background-color: #bbdefb;
+                color: #0d47a1;
+            }""")
         self.file_combo.currentTextChanged.connect(self.update_time_labels)
 
         self.ok_button = QPushButton("OK")
@@ -196,7 +191,6 @@ class TimeReportFeature:
         file_layout.addStretch()
         self.report_layout.addLayout(file_layout)
 
-        # Time range selection
         time_range_layout = QHBoxLayout()
         start_time_label = QLabel("Select Start Time:")
         start_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
@@ -221,7 +215,6 @@ class TimeReportFeature:
         time_range_layout.addStretch()
         self.report_layout.addLayout(time_range_layout)
 
-        # Dual time range slider
         slider_layout = QGridLayout()
         slider_label = QLabel("Drag Time Range:")
         slider_label.setStyleSheet("color: white; font-size: 14px;font:bold")
@@ -233,7 +226,6 @@ class TimeReportFeature:
         slider_layout.setColumnStretch(1, 1)
         self.report_layout.addLayout(slider_layout)
 
-        # Time labels
         time_info_layout = QHBoxLayout()
         self.start_time_label = QLabel("File Start Time: N/A")
         self.start_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
@@ -244,31 +236,12 @@ class TimeReportFeature:
         time_info_layout.addStretch()
         self.report_layout.addLayout(time_info_layout)
 
-        # Plot canvas
         self.report_layout.addWidget(self.canvas)
-
-        # Result text
-        self.result_text = QTextEdit()
-        self.result_text.setReadOnly(True)
-        self.result_text.setStyleSheet("background-color: #34495e; color: white; border-radius: 5px; padding: 10px;")
-        self.result_text.setMinimumHeight(100)
-        self.result_text.setText("Select a saved file, set time range, and click OK to view data.")
-        self.report_layout.addWidget(self.result_text)
         self.report_layout.addStretch()
-
-        # scroll_area = QScrollArea()
-        # scroll_area.setWidget(self.report_widget)
-        # scroll_area.setWidgetResizable(True)
-        # scroll_area.setStyleSheet("background-color: black; border: none;")
-        # scroll_area.setMaximumHeight(4000)
-        # layout.addWidget(scroll_area)
 
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.report_widget)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setMaximumHeight(4000)
-
-        # Style for the scroll area
         scroll_area.setStyleSheet("""
             QScrollArea {
                 border-radius: 8px;
@@ -296,9 +269,7 @@ class TimeReportFeature:
                 background: none;
             }
         """)
-
         layout.addWidget(scroll_area)
-
 
         self.refresh_filenames()
 
@@ -308,7 +279,7 @@ class TimeReportFeature:
             filenames = self.db.get_distinct_filenames(self.project_name)
             if not filenames:
                 self.file_combo.addItem("No Files Available")
-                self.result_text.setText("No saved files found for this project.")
+                self.parent.append_to_console("No saved files found for this project.")
                 self.start_time_label.setText("File Start Time: N/A")
                 self.stop_time_label.setText("File Stop Time: N/A")
                 self.start_time_edit.setEnabled(False)
@@ -328,7 +299,7 @@ class TimeReportFeature:
         except Exception as e:
             logging.error(f"Error refreshing filenames: {e}")
             self.file_combo.addItem("Error Loading Files")
-            self.result_text.setText(f"Error loading saved files: {str(e)}")
+            self.parent.append_to_console(f"Error loading saved files: {str(e)}")
             self.start_time_label.setText("File Start Time: N/A")
             self.stop_time_label.setText("File Stop Time: N/A")
             self.start_time_edit.setEnabled(False)
@@ -362,7 +333,7 @@ class TimeReportFeature:
                 self.end_time_edit.setEnabled(False)
                 self.time_slider.setEnabled(False)
                 self.ok_button.setEnabled(False)
-                self.result_text.setText(f"No data found for file: {filename}")
+                self.parent.append_to_console(f"No data found for file: {filename}")
                 self.file_start_time = None
                 self.file_end_time = None
                 return
@@ -375,6 +346,7 @@ class TimeReportFeature:
                     timestamps.append(timestamp)
                 except Exception as e:
                     logging.warning(f"Invalid timestamp in {filename}: {e}")
+                    self.parent.append_to_console(f"Invalid timestamp in {filename}: {e}")
                     continue
 
             if timestamps:
@@ -407,7 +379,7 @@ class TimeReportFeature:
             self.end_time_edit.setEnabled(False)
             self.time_slider.setEnabled(False)
             self.ok_button.setEnabled(False)
-            self.result_text.setText(f"Error loading time data for {filename}: {str(e)}")
+            self.parent.append_to_console(f"Error loading time data for {filename}: {str(e)}")
             self.file_start_time = None
             self.file_end_time = None
 
@@ -420,7 +392,6 @@ class TimeReportFeature:
             return
 
         left_pos, right_pos = self.time_slider.getValues()
-        # Ensure left_pos <= right_pos
         if left_pos > right_pos:
             left_pos, right_pos = right_pos, left_pos
             self.time_slider.setValues(left_pos, right_pos)
@@ -448,7 +419,7 @@ class TimeReportFeature:
 
         if start_time >= end_time:
             self.ok_button.setEnabled(False)
-            self.result_text.setText("Error: Start time must be before end time.")
+            self.parent.append_to_console("Error: Start time must be before end time.")
         else:
             self.ok_button.setEnabled(True)
             if self.file_start_time and self.file_end_time:
@@ -465,7 +436,7 @@ class TimeReportFeature:
     def plot_data(self):
         filename = self.file_combo.currentText()
         if not filename or filename in ["No Files Available", "Error Loading Files"]:
-            self.result_text.setText("No valid file selected to plot.")
+            self.parent.append_to_console("No valid file selected to plot.")
             self.figure.clear()
             self.canvas.draw()
             return
@@ -473,7 +444,7 @@ class TimeReportFeature:
         start_time = self.start_time_edit.dateTime().toPyDateTime()
         end_time = self.end_time_edit.dateTime().toPyDateTime()
         if start_time >= end_time:
-            self.result_text.setText("Error: Start time must be before end time.")
+            self.parent.append_to_console("Error: Start time must be before end time.")
             self.figure.clear()
             self.canvas.draw()
             return
@@ -485,7 +456,7 @@ class TimeReportFeature:
             ).sort("frameIndex", 1))
             
             if not data:
-                self.result_text.setText(f"No data found for file: {filename}")
+                self.parent.append_to_console(f"No data found for file: {filename}")
                 self.figure.clear()
                 self.canvas.draw()
                 return
@@ -493,7 +464,7 @@ class TimeReportFeature:
             num_channels = data[0].get("numberOfChannels", 1)
             data_rate = data[0].get("samplingRate", 4096.0)
             if not isinstance(num_channels, int) or num_channels < 1:
-                self.result_text.setText(f"Invalid number of channels ({num_channels}) for file: {filename}")
+                self.parent.append_to_console(f"Invalid number of channels ({num_channels}) for file: {filename}")
                 self.figure.clear()
                 self.canvas.draw()
                 return
@@ -507,7 +478,7 @@ class TimeReportFeature:
                 values = item.get("message", [])
                 if not values:
                     logging.warning(f"Empty message in frame {item.get('frameIndex')} for {filename}")
-                    self.result_text.append(f"Warning: Empty message in frame {item.get('frameIndex')} for {filename}")
+                    self.parent.append_to_console(f"Warning: Empty message in frame {item.get('frameIndex')} for {filename}")
                     continue
                 
                 try:
@@ -517,7 +488,7 @@ class TimeReportFeature:
                     timestamp = datetime.fromisoformat(created_at.replace('Z', '+00:00')) if 'Z' in created_at else datetime.fromisoformat(created_at)
                 except Exception as e:
                     logging.error(f"Invalid createdAt timestamp in frame {item.get('frameIndex')}: {e}")
-                    self.result_text.append(f"Error: Invalid timestamp in frame {item.get('frameIndex')} for {filename}")
+                    self.parent.append_to_console(f"Error: Invalid timestamp in frame {item.get('frameIndex')} for {filename}")
                     continue
 
                 if timestamp < start_time or timestamp > end_time:
@@ -525,7 +496,7 @@ class TimeReportFeature:
 
                 if len(values) % num_channels != 0:
                     logging.warning(f"Invalid data in frame {item.get('frameIndex')}: {len(values)} values not divisible by {num_channels} channels")
-                    self.result_text.append(f"Warning: Invalid data in frame {item.get('frameIndex')}: {len(values)} values not divisible by {num_channels} channels")
+                    self.parent.append_to_console(f"Warning: Invalid data in frame {item.get('frameIndex')}: {len(values)} values not divisible by {num_channels} channels")
                     continue
 
                 num_samples = len(values) // num_channels
@@ -540,11 +511,11 @@ class TimeReportFeature:
                                 channel_values[channel].append(float(values[value_idx]))
                             except (ValueError, TypeError) as e:
                                 logging.warning(f"Invalid value at frame {item.get('frameIndex')}, sample {sample_idx}, channel {channel}: {e}")
-                                self.result_text.append(f"Warning: Invalid value at frame {item.get('frameIndex')}, channel {channel + 1}")
+                                self.parent.append_to_console(f"Warning: Invalid value at frame {item.get('frameIndex')}, channel {channel + 1}")
                 current_time_offset += num_samples / data_rate
 
             if not time_points or not any(channel_values):
-                self.result_text.setText(f"No data found in the selected time range for file: {filename}")
+                self.parent.append_to_console(f"No data found in the selected time range for file: {filename}")
                 self.figure.clear()
                 self.canvas.draw()
                 return
@@ -588,10 +559,10 @@ class TimeReportFeature:
             self.figure.subplots_adjust(left=0.05, right=0.85, top=0.95, bottom=0.15, hspace=0.4)
             self.canvas.setMinimumSize(1000, 800)
             self.canvas.draw()
-            self.result_text.append(f"Successfully plotted data for {filename} with {num_channels} channels in selected time range")
+            self.parent.append_to_console(f"Successfully plotted data for {filename} with {num_channels} channels in selected time range")
         except Exception as e:
             logging.error(f"Error plotting data for {filename}: {e}")
-            self.result_text.setText(f"Error plotting data for {filename}: {str(e)}")
+            self.parent.append_to_console(f"Error plotting data for {filename}: {str(e)}")
             self.figure.clear()
             self.canvas.draw()
 
