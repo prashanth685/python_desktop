@@ -16,7 +16,7 @@ class MQTTWorker(QObject):
     error_occurred = pyqtSignal(str)
     status_update = pyqtSignal(str)
 
-    def __init__(self, db, project_name, broker="192.168.1.173", port=1883):
+    def __init__(self, db, project_name, broker="192.168.1.171", port=1883):
         super().__init__()
         self.db = db
         self.project_name = project_name

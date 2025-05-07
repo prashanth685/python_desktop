@@ -1,9 +1,10 @@
 import sys
+import gc
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QSplitter,
                              QToolBar, QAction, QTreeWidget, QTreeWidgetItem, QInputDialog, QMessageBox,
                              QSizePolicy, QApplication, QTextEdit)
 from PyQt5.QtCore import Qt, QSize, QTimer, QCoreApplication
-from PyQt5.QtGui import QIcon, QColor
+from PyQt5.QtGui import QIcon, QColor 
 import os
 from mqtthandler import MQTTHandler  # Assumes QThread-based MQTTHandler
 from features.create_tags import CreateTagsFeature
@@ -57,6 +58,7 @@ class DashboardWindow(QWidget):
                 self.mqtt_connected = True
                 logging.info(f"MQTT setup for project: {self.current_project}")
                 self.append_to_console(f"MQTT setup for project: {self.current_project}")
+                
             else:
                 logging.warning(f"No tags found for project: {self.current_project}")
                 self.mqtt_connected = False
@@ -166,56 +168,54 @@ class DashboardWindow(QWidget):
         # Apply global stylesheet for QInputDialog and QMessageBox
         app = QApplication.instance()
         app.setStyleSheet("""
-            QInputDialog {
-                background-color: #2c3e50;
-                color: white;
-                font-size: 16px;
-                width:250px;
-            }
-            QInputDialog QLineEdit {
-                background-color: #34495e;
-                color: white;
-                border: 1px solid #3498db;
-                padding: 5px;
-                border-radius: 3px;
-            }
-            QInputDialog QLabel {
-                color: white;
-                font-size: 16px;
-            }
-            QInputDialog QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 3px;
-                font-size: 14px;
-            }
-            QInputDialog QPushButton:hover {
-                background-color: #2980b9;
-            }
-            QMessageBox {
-                background-color: #2c3e50;
-                color: white;
-                font-size: 16px;
-                width:250px;
-            }
-            QMessageBox QLabel {
-                color: white;
-                font-size: 16px;
-            }
-            QMessageBox QPushButton {
-                background-color: #3498db;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 3px;
-                font-size: 14px;
-            }
-            QMessageBox QPushButton:hover {
-                background-color: #2980b9;
-            }
-        """)
+    QInputDialog, QMessageBox {
+        background-color: #2c3e50;
+        color: white;
+        font-size: 16px;
+        width: 400px;
+        border: 1px solid #1a252f;
+        border-radius: 8px;
+        padding: 15px;
+    }
+
+    QInputDialog QLineEdit {
+        background-color: #34495e;
+        color: white;
+        border: 1px solid #3498db;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 15px;
+    }
+
+    QInputDialog QLabel,
+    QMessageBox QLabel {
+        color: #ecf0f1;
+        font-size: 16px;
+        padding-bottom: 10px;
+    }
+
+    QInputDialog QPushButton,
+    QMessageBox QPushButton {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 5px;
+        font-size: 15px;
+        min-width: 80px;
+        transition: background-color 0.2s ease;
+    }
+
+    QInputDialog QPushButton:hover,
+    QMessageBox QPushButton:hover {
+        background-color: #2980b9;
+    }
+
+    QInputDialog QPushButton:pressed,
+    QMessageBox QPushButton:pressed {
+        background-color: #2471a3;
+    }
+""")
 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -286,12 +286,14 @@ class DashboardWindow(QWidget):
         main_splitter.addWidget(self.tree)
 
         right_container = QWidget()
+        right_container.setStyleSheet("background-color: #2c3e50;")
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
         right_container.setLayout(right_layout)
 
         subtoolbar_container = QWidget()
+        subtoolbar_container.setStyleSheet("background-color: #1e2937;")
         subtoolbar_layout = QVBoxLayout()
         subtoolbar_layout.setContentsMargins(0, 0, 0, 0)
         subtoolbar_layout.setSpacing(0)
@@ -303,11 +305,11 @@ class DashboardWindow(QWidget):
         subtoolbar_layout.addWidget(self.subtoolbar)
 
         content_container = QWidget()
+        content_container.setStyleSheet("background-color: #2c3e50;")
         self.content_layout = QVBoxLayout()
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(0)
         content_container.setLayout(self.content_layout)
-        content_container.setStyleSheet("background-color: #2c3e50")
 
         self.console = QTextEdit()
         self.console.setReadOnly(True)
@@ -346,6 +348,8 @@ class DashboardWindow(QWidget):
                     color: white;
                 }
             """)
+            self.file_bar.hide()
+            self.file_bar.show()
             self.file_bar.update()
             self.file_bar.repaint()
             QCoreApplication.processEvents()
@@ -400,6 +404,10 @@ class DashboardWindow(QWidget):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
+        self.toolbar.hide()
+        self.toolbar.show()
+        self.toolbar.update()
+        self.toolbar.repaint()
         self.update_file_bar()
 
     def update_subtoolbar(self):
@@ -437,14 +445,23 @@ class DashboardWindow(QWidget):
         add_action("▶️", "#00ff00", self.start_saving, "Start Saving Data (Time View)", is_time_view and not self.is_saving, "#2c3e50")
         add_action("⏸️", "#ff3333", self.stop_saving, "Stop Saving Data (Time View)", is_time_view and self.is_saving, "#2c3e50")
         self.subtoolbar.addSeparator()
-        connect_bg = "#00ff00" if self.mqtt_connected else "#2c3e50"
-        disconnect_bg = "#ff3333" if not self.mqtt_connected else "#2c3e50"
-        add_action("🔗", "#ffffff", self.connect_mqtt, "Connect to MQTT", not self.mqtt_connected, connect_bg)
-        add_action("🔌", "#ffffff", self.disconnect_mqtt, "Disconnect from MQTT", self.mqtt_connected, disconnect_bg)
+        
+        connect_bg = "green" if self.mqtt_connected else "#2c3e50"
+        disconnect_bg = "red" if not self.mqtt_connected else "#2c3e50"
+        # add_action("🔗", "#ffffff", self.connect_mqtt, "Connect to MQTT", not self.mqtt_connected, connect_bg)
+        # add_action("🔌", "#ffffff", self.disconnect_mqtt, "Disconnect from MQTT", self.mqtt_connected, disconnect_bg)
+        add_action("🟢", "#ffffff", self.connect_mqtt, "Connect to MQTT", not self.mqtt_connected, connect_bg)
+        add_action("🔴", "#ffffff", self.disconnect_mqtt, "Disconnect from MQTT", self.mqtt_connected, disconnect_bg)
+
 
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.subtoolbar.addWidget(spacer)
+        self.subtoolbar.hide()
+        self.subtoolbar.show()
+        self.subtoolbar.update()
+        self.subtoolbar.repaint()
+        QCoreApplication.processEvents()
         self.update_file_bar()
 
     def load_project_features(self):
@@ -665,9 +682,10 @@ class DashboardWindow(QWidget):
                 if feature_instance and feature_instance.project_name == project_name:
                     try:
                         widget = feature_instance.get_widget()
-                        if widget:
+                        if widget and not widget.isHidden():
                             self.content_layout.addWidget(widget)
                             widget.show()
+                            self.update()
                             self.repaint()
                             QCoreApplication.processEvents()
                             self.update_file_bar()
@@ -683,14 +701,14 @@ class DashboardWindow(QWidget):
                     "Tabular View": TabularViewFeature,
                     "Time View": TimeViewFeature,
                     "Time Report": TimeReportFeature,
-                    "FFT": FFTViewFeature,
-                    "Waterfall": WaterfallFeature,
-                    "Orbit": OrbitFeature,
-                    "Trend View": TrendViewFeature,
-                    "Multiple Trend View": MultiTrendFeature,
-                    "Bode Plot": BodePlotFeature,
-                    "History Plot": HistoryPlotFeature,
-                    "Report": ReportFeature
+                #     "FFT": FFTViewFeature,
+                #     "Waterfall": WaterfallFeature,
+                #     "Orbit": OrbitFeature,
+                #     "Trend View": TrendViewFeature,
+                #     "Multiple Trend View": MultiTrendFeature,
+                #     "Bode Plot": BodePlotFeature,
+                #     "History Plot": HistoryPlotFeature,
+                #     "Report": ReportFeature
                 }
 
                 if feature_name in feature_classes:
@@ -703,6 +721,7 @@ class DashboardWindow(QWidget):
                         if widget:
                             self.content_layout.addWidget(widget)
                             widget.show()
+                            self.update()
                             self.repaint()
                             QCoreApplication.processEvents()
                             self.update_file_bar()
@@ -718,9 +737,12 @@ class DashboardWindow(QWidget):
             except Exception as e:
                 logging.error(f"Error displaying feature content: {str(e)}")
                 QMessageBox.warning(self, "Error", f"Error displaying feature: {str(e)}")
+            finally:
+                self.update()
+                self.repaint()
 
-        # Use a short delay to allow UI to stabilize
-        QTimer.singleShot(50, render_feature)
+        # Use a longer delay to allow UI to stabilize
+        QTimer.singleShot(150, render_feature)
 
     def save_action(self):
         """Save the current project's data."""
@@ -794,8 +816,12 @@ class DashboardWindow(QWidget):
                     logging.error(f"Error cleaning up feature instance {feature_name}: {str(e)}")
             self.feature_instances.clear()
 
+            # Force garbage collection to release memory
+            gc.collect()
+
             # Force UI update
             QCoreApplication.processEvents()
+            self.update()
             self.repaint()
             self.update_file_bar()
         except Exception as e:

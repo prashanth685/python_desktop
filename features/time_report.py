@@ -1,4 +1,5 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton, QScrollArea, QDateTimeEdit, QGridLayout)
+from PyQt5.QtCore import QPropertyAnimation, QEasingCurve
 from PyQt5.QtCore import Qt, QDateTime, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -113,6 +114,13 @@ class TimeReportFeature:
         self.file_start_time = None
         self.file_end_time = None
         self.initUI()
+    def animate_button_press(self):
+        animation = QPropertyAnimation(self.ok_button, b"styleSheet")
+        animation.setDuration(200)
+        animation.setStartValue("background-color: #1a73e8;")
+        animation.setEndValue("background-color: #155ab6;")
+        animation.setEasingCurve(QEasingCurve.InOutQuad)
+        animation.start()
 
     def initUI(self):
         layout = QVBoxLayout()
@@ -181,7 +189,21 @@ class TimeReportFeature:
         self.file_combo.currentTextChanged.connect(self.update_time_labels)
 
         self.ok_button = QPushButton("OK")
-        self.ok_button.setStyleSheet("background-color: #1a73e8; color: white; padding: 15px; font-size:15px;width:100px;border-radius:50%;font:bold")
+        self.ok_button.setStyleSheet("""
+    QPushButton {
+        background-color: #1a73e8;
+        color: white;
+        padding: 15px;
+        font-size: 15px;
+        width: 100px;
+        border-radius: 50%;
+        font-weight: bold;
+    }
+    QPushButton:pressed {
+        background-color: darkgreen;  /* darker blue when pressed */
+    }
+""")
+
         self.ok_button.clicked.connect(self.plot_data)
         self.ok_button.setEnabled(False)
 
@@ -195,17 +217,17 @@ class TimeReportFeature:
         start_time_label = QLabel("Select Start Time:")
         start_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
         self.start_time_edit = QDateTimeEdit()
-        self.start_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold")
-        self.start_time_edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
-        self.start_time_edit.setCalendarPopup(True)
+        self.start_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold;width:200px")
+        self.start_time_edit.setDisplayFormat("HH:mm:ss")
+        # self.start_time_edit.setCalendarPopup(True)
         self.start_time_edit.dateTimeChanged.connect(self.validate_time_range)
 
         end_time_label = QLabel("Select End Time:")
         end_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
         self.end_time_edit = QDateTimeEdit()
-        self.end_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold")
-        self.end_time_edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
-        self.end_time_edit.setCalendarPopup(True)
+        self.end_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold;width:200px")
+        self.end_time_edit.setDisplayFormat("HH:mm:ss")
+        # self.end_time_edit.setCalendarPopup(True)
         self.end_time_edit.dateTimeChanged.connect(self.validate_time_range)
 
         time_range_layout.addWidget(start_time_label)
