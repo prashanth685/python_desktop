@@ -35,7 +35,7 @@ class TimeViewFeature:
         self.save_timer = QTimer(self.widget)
         self.save_timer.timeout.connect(self.update_save_duration)
         self.initUI()
-        
+
     def get_widget(self):
         return self.widget
 
@@ -50,28 +50,25 @@ class TimeViewFeature:
         return max_counter + 1
 
     def initUI(self):
-        layout = QVBoxLayout()
-        self.widget.setLayout(layout)
+        main_layout = QVBoxLayout()
+        self.widget.setLayout(main_layout)
 
+        # Fixed control widget (outside scroll area)
+        control_widget = QWidget()
+        control_layout = QVBoxLayout()
+        control_widget.setLayout(control_layout)
+        control_widget.setStyleSheet("background-color: #2c3e50; border-radius: 5px; padding: 10px 20px;")
+
+        # Header - Centered
         header = QLabel(f"TIME VIEW FOR {self.project_name.upper()}")
-        header.setStyleSheet("color: white; font-size: 26px; font-weight: bold; padding: 8px;")
+        header.setStyleSheet("color: white; font-size: 20px; font-weight: bold; margin-bottom: 10px;")
         self.header = header
-        layout.addWidget(header, alignment=Qt.AlignCenter)
+        control_layout.addWidget(header, alignment=Qt.AlignCenter)
 
-        self.time_widget = QWidget()
-        self.time_layout = QVBoxLayout()
-        self.time_widget.setLayout(self.time_layout)
-        self.time_widget.setStyleSheet("background-color: #2c3e50; border-radius: 5px; padding: 10px;")
-
+        # Tag selection row - Mimic flex with proper alignment
         tag_layout = QHBoxLayout()
         tag_label = QLabel("Select Tag:")
-        tag_label.setStyleSheet("""
-            color: white;
-            font-size: 20px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            padding-bottom: 4px;
-        """)
+        tag_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold; margin-right: 15px;")
 
         self.tag_combo = QComboBox()
         tags_data = list(self.db.tags_collection.find({"project_name": self.project_name}))
@@ -81,131 +78,109 @@ class TimeViewFeature:
             for tag in tags_data:
                 self.tag_combo.addItem(tag["tag_name"])
         self.tag_combo.setStyleSheet("""
-    QComboBox {
-        background-color: #fdfdfd;
-        color: #212121;
-        border: 2px solid #90caf9;
-        border-radius: 8px;
-        padding: 10px 40px 10px 14px;
-        font-size: 16px;
-        font-weight: 600;
-        min-width: 220px;
-        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
-    }
-
-    QComboBox:hover {
-        border: 2px solid #42a5f5;
-        background-color: #f5faff;
-    }
-
-    QComboBox:focus {
-        border: 2px solid #1e88e5;
-        background-color: #ffffff;
-    }
-
-    QComboBox::drop-down {
-        subcontrol-origin: padding;
-        subcontrol-position: top right;
-        width: 36px;
-        border-left: 1px solid #e0e0e0;
-        background-color: #e3f2fd;
-        border-top-right-radius: 8px;
-        border-bottom-right-radius: 8px;
-    }
-
-    QComboBox QAbstractItemView {
-        background-color: #ffffff;
-        border: 1px solid #90caf9;
-        border-radius: 4px;
-        padding: 5px;
-        selection-background-color: #e3f2fd;
-        selection-color: #0d47a1;
-        font-size: 15px;
-        outline: 0;
-    }
-
-    QComboBox::item {
-        padding: 10px 8px;
-        border: none;
-    }
-
-    QComboBox::item:selected {
-        background-color: #bbdefb;
-        color: #0d47a1;
-    }
-""")
-
+            QComboBox {
+                background-color: #ffffff;
+                color: #212121;
+                border: 1px solid #90caf9;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 14px;
+                font-weight: 500;
+                min-width: 200px;
+                max-width: 250px;
+            }
+            QComboBox:hover {
+                border: 1px solid #42a5f5;
+                background-color: #f5faff;
+            }
+            QComboBox:focus {
+                border: 1px solid #1e88e5;
+                background-color: #ffffff;
+            }
+            QComboBox::drop-down {
+                width: 25px;
+                border-left: 1px solid #e0e0e0;
+                background-color: #e3f2fd;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                border: 1px solid #90caf9;
+                border-radius: 4px;
+                padding: 3px;
+                selection-background-color: #e3f2fd;
+                selection-color: #0d47a1;
+                font-size: 14px;
+                outline: 0;
+            }
+            QComboBox::item {
+                padding: 4px 6px;
+            }
+            QComboBox::item:selected {
+                background-color: #bbdefb;
+                color: #0d47a1;
+            }
+        """)
         self.tag_combo.currentTextChanged.connect(self.setup_time_view_plot)
 
-        tag_layout.addWidget(tag_label)
-        tag_layout.addWidget(self.tag_combo)
-        tag_layout.addStretch()
-        self.time_layout.addLayout(tag_layout)
+        tag_layout.addWidget(tag_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        tag_layout.addWidget(self.tag_combo, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        tag_layout.addStretch()  # Push content to the left, mimic flex-start
+        tag_layout.setSpacing(0)
+        control_layout.addLayout(tag_layout)
 
+        # Save controls row - Align elements with proper spacing
         save_layout = QHBoxLayout()
         filename_label = QLabel("Saving File:")
-        filename_label.setStyleSheet("""
-            color: white;
-            font-size: 20px;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            padding-bottom: 4px;
-        """)
+        filename_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold; margin-right: 15px;")
+
         self.filename_combo = QComboBox()
         self.filename_combo.setStyleSheet("""
-    QComboBox {
-        background-color: #fdfdfd;
-        color: #212121;
-        border: 2px solid #90caf9;
-        border-radius: 8px;
-        padding: 10px 40px 10px 14px;
-        font-size: 16px;
-        font-weight: 600;
-        min-width: 220px;
-        box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.05);
-    }
-
-    QComboBox:hover {
-        border: 2px solid #42a5f5;
-        background-color: #f5faff;
-    }
-
-    QComboBox:focus {
-        border: 2px solid #1e88e5;
-        background-color: #ffffff;
-    }
-
-    QComboBox::drop-down {
-        subcontrol-origin: padding;
-        subcontrol-position: top right;
-        width: 36px;
-        border-left: 1px solid #e0e0e0;
-        background-color: #e3f2fd;
-        border-top-right-radius: 8px;
-        border-bottom-right-radius: 8px;
-    }
-
-    QComboBox QAbstractItemView {
-        background-color: #ffffff;
-        border: 1px solid #90caf9;
-        border-radius: 4px;
-        padding: 5px;
-        selection-background-color: #e3f2fd;
-        selection-color: #0d47a1;
-        font-size: 15px;
-        outline: 0;
-    }
-
-    QComboBox::item {
-        padding: 10px 8px;
-        border: none;
-    }
-
-    QComboBox::item:selected {
-        background-color: #bbdefb;
-        color: #0d47a1;
-    }
-""")
+            QComboBox {
+                background-color: #ffffff;
+                color: #212121;
+                border: 1px solid #90caf9;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 14px;
+                font-weight: 500;
+                min-width: 200px;
+                max-width: 250px;
+            }
+            QComboBox:hover {
+                border: 1px solid #42a5f5;
+                background-color: #f5faff;
+            }
+            QComboBox:focus {
+                border: 1px solid #1e88e5;
+                background-color: #ffffff;
+            }
+            QComboBox::drop-down {
+                width: 25px;
+                border-left: 1px solid #e0e0e0;
+                background-color: #e3f2fd;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                border: 1px solid #90caf9;
+                border-radius: 4px;
+                padding: 3px;
+                selection-background-color: #e3f2fd;
+                selection-color: #0d47a1;
+                font-size: 14px;
+                outline: 0;
+            }
+            QComboBox::item {
+                padding: 4px 6px;
+            }
+            QComboBox::item:selected {
+                background-color: #bbdefb;
+                color: #0d47a1;
+            }
+        """)
         self.filename_combo.setEnabled(False)
         self.refresh_filenames()
         self.filename_combo.currentTextChanged.connect(self.open_data_table)
@@ -215,85 +190,106 @@ class TimeViewFeature:
             QPushButton {
                 background-color: #1a73e8;
                 color: white;
-                padding: 15px;
-                border-radius: 50px;
-                font-size: 15px;
-                margin-left:50px;
-                font:bold;
-                
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: bold;
+                margin-left: 10px;
             }
             QPushButton:disabled {
-            background-color: #E0E0E0;
-            color: red;
-            border: 1px solid #BDBDBD;
-        }
+                background-color: #E0E0E0;
+                color: red;
+                border: 1px solid #BDBDBD;
+            }
         """)
         self.start_save_button.clicked.connect(self.start_saving)
-        
+
         self.stop_save_button = QPushButton("Stop Saving")
-        self.stop_save_button.setStyleSheet("background-color: #e63946; color: white; padding: 15px; border-radius: 5px; font-size:15px;gap:15px;font:bold")
+        self.stop_save_button.setStyleSheet("""
+            QPushButton {
+                background-color: #e63946;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: bold;
+                margin-left: 10px;
+            }
+        """)
         self.stop_save_button.clicked.connect(self.stop_saving)
         self.stop_save_button.setEnabled(False)
 
         self.timer_label = QLabel("Save Duration: 00:00:00")
-        self.timer_label.setStyleSheet("color: white; font-size: 16px;")
+        self.timer_label.setStyleSheet("color: white; font-size: 14px; font-weight: 500; margin-left: 15px;")
 
-        save_layout.addWidget(filename_label)
-        save_layout.addWidget(self.filename_combo)
-        save_layout.addWidget(self.start_save_button)
-        save_layout.addWidget(self.stop_save_button)
-        save_layout.addWidget(self.timer_label)
-        save_layout.addStretch()
-        self.time_layout.addLayout(save_layout)
+        save_layout.addWidget(filename_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        save_layout.addWidget(self.filename_combo, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        save_layout.addWidget(self.start_save_button, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        save_layout.addWidget(self.stop_save_button, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        save_layout.addWidget(self.timer_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        save_layout.addStretch()  # Push content to the left
+        save_layout.setSpacing(0)
+        control_layout.addLayout(save_layout)
 
+        # Time info row - Distribute elements evenly
         time_info_layout = QHBoxLayout()
         self.start_time_label = QLabel("Start Time: N/A")
-        self.start_time_label.setStyleSheet("color: white; font-size: 20px;font-weight: 500")
+        self.start_time_label.setStyleSheet("color: white; font-size: 14px; font-weight: 500;")
         self.end_time_label = QLabel("End Time: N/A")
-        self.end_time_label.setStyleSheet("color: white; font-size: 20px;font-weight: 500")
+        self.end_time_label.setStyleSheet("color: white; font-size: 14px; font-weight: 500; margin-left: 20px;")
         self.latest_filename_label = QLabel(f"Saving File: data{self.filename_counter}")
-        self.latest_filename_label.setStyleSheet("color: white; font-size: 20px;font-weight: 500")
-        
-        time_info_layout.addWidget(self.start_time_label)
-        time_info_layout.addWidget(self.end_time_label)
-        time_info_layout.addWidget(self.latest_filename_label)
-        time_info_layout.addStretch()
-        self.time_layout.addLayout(time_info_layout)
+        self.latest_filename_label.setStyleSheet("color: white; font-size: 14px; font-weight: 500; margin-left: 20px;")
 
-        self.time_layout.addWidget(self.canvas)
+        time_info_layout.addWidget(self.start_time_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        time_info_layout.addWidget(self.end_time_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        time_info_layout.addWidget(self.latest_filename_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
+        time_info_layout.addStretch()  # Push content to the left
+        time_info_layout.setSpacing(0)
+        control_layout.addLayout(time_info_layout)
+
+        control_layout.setSpacing(15)  # Consistent spacing between sections
+        control_layout.setContentsMargins(0, 0, 0, 0)  # Remove extra margins
+        main_layout.addWidget(control_widget)
+
+        # Scrollable graph area
+        self.graph_widget = QWidget()
+        self.graph_layout = QVBoxLayout()
+        self.graph_widget.setLayout(self.graph_layout)
+        self.graph_widget.setStyleSheet("background-color: #2c3e50; border: 1px solid #ffffff; border-radius: 5px; padding: 8px;")
+
+        self.graph_layout.addWidget(self.canvas)
 
         scroll_area = QScrollArea()
-        scroll_area.setWidget(self.time_widget)
+        scroll_area.setWidget(self.graph_widget)
         scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # Disable horizontal scrollbar
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)    # Enable vertical scrollbar when needed
         scroll_area.setStyleSheet("""
             QScrollArea {
-                border-radius: 8px;
-                padding: 5px;
+                border: none;
+                background-color: #2c3e50;
+                border-radius: 5px;
             }
-
             QScrollBar:vertical {
-                background: white;
-                width: 10px;
+                background: #ffffff;
+                width: 8px;
                 margin: 0px;
-                border-radius: 5px;
+                border-radius: 4px;
             }
-
             QScrollBar::handle:vertical {
-                background: black;
-                border-radius: 5px;
+                background: #000000;
+                border-radius: 4px;
             }
-
             QScrollBar::add-line:vertical,
             QScrollBar::sub-line:vertical {
                 height: 0px;
             }
-
             QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
                 background: none;
             }
         """)
-        scroll_area.setMaximumHeight(4000)
-        layout.addWidget(scroll_area)
+        scroll_area.setMinimumHeight(300)  # Reasonable height for the graph area
+        main_layout.addWidget(scroll_area)
 
         if tags_data:
             self.tag_combo.setCurrentIndex(0)
@@ -402,7 +398,7 @@ class TimeViewFeature:
         self.stop_save_button.setEnabled(False)
         self.save_timer.stop()
         self.timer_label.setText("Save Duration: 00:00:00")
-        self.timer_label.setStyleSheet(" font-size: 20px;font-weight: 500;color:white")
+        self.timer_label.setStyleSheet("font-size: 14px; font-weight: 500; color: white; margin-left: 15px;")
         self.start_time_label.setText("Start Time: N/A")
         self.end_time_label.setText("End Time: N/A")
         if hasattr(self, 'latest_filename_label'):
@@ -428,13 +424,15 @@ class TimeViewFeature:
         self.axes = []
         self.lines = []
 
+        self.figure.set_size_inches(10, 3 * num_channels)  # Height scales with number of channels
+
         for i in range(num_channels):
             ax = self.figure.add_subplot(num_channels, 1, i+1)
             line, = ax.plot([], [], f'C{i}-', linewidth=1.5)
             self.lines.append(line)
             self.axes.append(ax)
             ax.grid(True, linestyle='--', alpha=0.7)
-            ax.set_ylabel(f"Channel {i+1}", rotation=0, labelpad=40,fontweight='bold')
+            ax.set_ylabel(f"Channel {i+1}", rotation=0, labelpad=40, fontweight='bold')
             ax.yaxis.set_label_position("right")
             ax.yaxis.tick_right()
             ax.set_xlabel("Time (s)")
@@ -443,8 +441,8 @@ class TimeViewFeature:
             ax.set_xticks(np.linspace(0, self.window_size, 11))
 
         self.figure.subplots_adjust(left=0.05, right=0.85, top=0.95, bottom=0.15, hspace=0.4)
-        self.canvas.setMinimumSize(1000, 800)
-        self.time_widget.setMinimumSize(1000, 1300)
+        self.canvas.setMinimumSize(1000, 300 * num_channels)
+        self.graph_widget.setMinimumSize(1000, 300 * num_channels)
         self.canvas.draw()
         logging.info(f"Initialized {num_channels} subplots for tag {self.mqtt_tag}")
         self.parent.append_to_console(f"Initialized {num_channels} subplots for tag {self.mqtt_tag}")
@@ -608,4 +606,3 @@ class TimeViewFeature:
         current_time = datetime.now()
         timestamp = current_time.isoformat()
         self.split_and_store_values(values, timestamp)
-
