@@ -215,6 +215,10 @@ class TimeViewFeature:
                 font-weight: bold;
                 margin-left: 10px;
             }
+            QPushButton::pressed {
+                background-color: red;
+            }
+
         """)
         self.stop_save_button.clicked.connect(self.stop_saving)
         self.stop_save_button.setEnabled(False)

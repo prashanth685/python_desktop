@@ -114,6 +114,7 @@ class TimeReportFeature:
         self.file_start_time = None
         self.file_end_time = None
         self.initUI()
+
     def animate_button_press(self):
         animation = QPropertyAnimation(self.ok_button, b"styleSheet")
         animation.setDuration(200)
@@ -126,18 +127,21 @@ class TimeReportFeature:
         layout = QVBoxLayout()
         self.widget.setLayout(layout)
 
+        # Header
         header = QLabel(f"TIME REPORT FOR {self.project_name.upper()}")
         header.setStyleSheet("color: white; font-size: 26px; font-weight: bold; padding: 8px;")
         layout.addWidget(header, alignment=Qt.AlignCenter)
 
-        self.report_widget = QWidget()
-        self.report_layout = QVBoxLayout()
-        self.report_widget.setLayout(self.report_layout)
-        self.report_widget.setStyleSheet("background-color: #2c3e50; border-radius: 5px; padding: 10px;")
+        # Controls container (not scrollable)
+        controls_widget = QWidget()
+        controls_widget.setStyleSheet("background-color: #2c3e50; border-radius: 5px; padding: 10px;")
+        controls_layout = QVBoxLayout()
+        controls_widget.setLayout(controls_layout)
 
+        # File selection layout
         file_layout = QHBoxLayout()
         file_label = QLabel("Select Saved File:")
-        file_label.setStyleSheet("color: white; font-size: 16px;font:bold")
+        file_label.setStyleSheet("color: white; font-size: 16px; font: bold")
         self.file_combo = QComboBox()
         self.file_combo.setStyleSheet("""
             QComboBox {
@@ -185,25 +189,25 @@ class TimeReportFeature:
             QComboBox::item:selected {
                 background-color: #bbdefb;
                 color: #0d47a1;
-            }""")
+            }
+        """)
         self.file_combo.currentTextChanged.connect(self.update_time_labels)
 
         self.ok_button = QPushButton("OK")
         self.ok_button.setStyleSheet("""
-    QPushButton {
-        background-color: #1a73e8;
-        color: white;
-        padding: 15px;
-        font-size: 15px;
-        width: 100px;
-        border-radius: 50%;
-        font-weight: bold;
-    }
-    QPushButton:pressed {
-        background-color: darkgreen;  /* darker blue when pressed */
-    }
-""")
-
+            QPushButton {
+                background-color: #1a73e8;
+                color: white;
+                padding: 15px;
+                font-size: 15px;
+                width: 100px;
+                border-radius: 50%;
+                font-weight: bold;
+            }
+            QPushButton:pressed {
+                background-color: darkgreen;
+            }
+        """)
         self.ok_button.clicked.connect(self.plot_data)
         self.ok_button.setEnabled(False)
 
@@ -211,23 +215,22 @@ class TimeReportFeature:
         file_layout.addWidget(self.file_combo)
         file_layout.addWidget(self.ok_button)
         file_layout.addStretch()
-        self.report_layout.addLayout(file_layout)
+        controls_layout.addLayout(file_layout)
 
+        # Time range selection layout
         time_range_layout = QHBoxLayout()
         start_time_label = QLabel("Select Start Time:")
-        start_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
+        start_time_label.setStyleSheet("color: white; font-size: 14px; font: bold")
         self.start_time_edit = QDateTimeEdit()
-        self.start_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold;width:200px")
+        self.start_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px; font: bold; width: 200px")
         self.start_time_edit.setDisplayFormat("HH:mm:ss")
-        # self.start_time_edit.setCalendarPopup(True)
         self.start_time_edit.dateTimeChanged.connect(self.validate_time_range)
 
         end_time_label = QLabel("Select End Time:")
-        end_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
+        end_time_label.setStyleSheet("color: white; font-size: 14px; font: bold")
         self.end_time_edit = QDateTimeEdit()
-        self.end_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px;font:bold;width:200px")
+        self.end_time_edit.setStyleSheet("background-color: #34495e; color: white; border: 2px solid white; padding: 15px; font: bold; width: 200px")
         self.end_time_edit.setDisplayFormat("HH:mm:ss")
-        # self.end_time_edit.setCalendarPopup(True)
         self.end_time_edit.dateTimeChanged.connect(self.validate_time_range)
 
         time_range_layout.addWidget(start_time_label)
@@ -235,63 +238,73 @@ class TimeReportFeature:
         time_range_layout.addWidget(end_time_label)
         time_range_layout.addWidget(self.end_time_edit)
         time_range_layout.addStretch()
-        self.report_layout.addLayout(time_range_layout)
+        controls_layout.addLayout(time_range_layout)
 
+        # Slider layout
         slider_layout = QGridLayout()
         slider_label = QLabel("Drag Time Range:")
-        slider_label.setStyleSheet("color: white; font-size: 14px;font:bold")
+        slider_label.setStyleSheet("color: white; font-size: 14px; font: bold")
         slider_label.setFixedWidth(150)
         self.time_slider = QRangeSlider(self.widget)
         self.time_slider.valueChanged.connect(self.update_time_from_slider)
         slider_layout.addWidget(slider_label, 0, 0, 1, 1, Qt.AlignLeft | Qt.AlignVCenter)
         slider_layout.addWidget(self.time_slider, 0, 1, 1, 1)
         slider_layout.setColumnStretch(1, 1)
-        self.report_layout.addLayout(slider_layout)
+        controls_layout.addLayout(slider_layout)
 
+        # Time info layout
         time_info_layout = QHBoxLayout()
         self.start_time_label = QLabel("File Start Time: N/A")
-        self.start_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
+        self.start_time_label.setStyleSheet("color: white; font-size: 14px; font: bold")
         self.stop_time_label = QLabel("File Stop Time: N/A")
-        self.stop_time_label.setStyleSheet("color: white; font-size: 14px;font:bold")
+        self.stop_time_label.setStyleSheet("color: white; font-size: 14px; font: bold")
         time_info_layout.addWidget(self.start_time_label)
         time_info_layout.addWidget(self.stop_time_label)
         time_info_layout.addStretch()
-        self.report_layout.addLayout(time_info_layout)
+        controls_layout.addLayout(time_info_layout)
 
-        self.report_layout.addWidget(self.canvas)
-        self.report_layout.addStretch()
+        # Add the controls widget to the main layout (not scrollable)
+        layout.addWidget(controls_widget)
 
+        # Graph container with scrollbar
+        graph_container = QWidget()
+        graph_layout = QVBoxLayout()
+        graph_container.setLayout(graph_layout)
+        graph_container.setStyleSheet("background-color: #2c3e50; border-radius: 5px; padding: 10px;")
+
+        # Add the canvas to the graph layout
+        graph_layout.addWidget(self.canvas)
+
+        # Create a QScrollArea for the graph only
         scroll_area = QScrollArea()
-        scroll_area.setWidget(self.report_widget)
+        scroll_area.setWidget(graph_container)
         scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("""
             QScrollArea {
                 border-radius: 8px;
                 padding: 5px;
             }
-
             QScrollBar:vertical {
                 background: white;
                 width: 10px;
                 margin: 0px;
                 border-radius: 5px;
             }
-
             QScrollBar::handle:vertical {
                 background: black;
                 border-radius: 5px;
             }
-
             QScrollBar::add-line:vertical,
             QScrollBar::sub-line:vertical {
                 height: 0px;
             }
-
-            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+            QScrollBar::add-page:vertical,
+            QScrollBar::sub-page:vertical {
                 background: none;
             }
         """)
-        layout.addWidget(scroll_area)
+        # Ensure the scroll area takes the remaining space
+        layout.addWidget(scroll_area, stretch=1)
 
         self.refresh_filenames()
 

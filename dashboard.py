@@ -3,7 +3,7 @@ import gc
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QSplitter,
                              QToolBar, QAction, QTreeWidget, QTreeWidgetItem, QInputDialog, QMessageBox,
                              QSizePolicy, QApplication, QTextEdit)
-from PyQt5.QtCore import Qt, QSize, QTimer, QCoreApplication
+from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QColor 
 import os
 from mqtthandler import MQTTHandler  # Assumes QThread-based MQTTHandler
@@ -36,8 +36,16 @@ class DashboardWindow(QWidget):
         self.timer.setSingleShot(True)
         self.is_saving = False
         self.mqtt_connected = False
+        self.fft_window = None  # Kept for compatibility, not used
 
+        # Initialize UI first
         self.initUI()
+
+        # Defer other initialization tasks to ensure smooth window opening
+        QTimer.singleShot(0, self.deferred_initialization)
+
+    def deferred_initialization(self):
+        """Perform initialization tasks after the window is shown."""
         self.load_project_features()
         self.setup_mqtt()
         self.display_feature_content("Create Tags", self.current_project)
@@ -58,7 +66,6 @@ class DashboardWindow(QWidget):
                 self.mqtt_connected = True
                 logging.info(f"MQTT setup for project: {self.current_project}")
                 self.append_to_console(f"MQTT setup for project: {self.current_project}")
-                
             else:
                 logging.warning(f"No tags found for project: {self.current_project}")
                 self.mqtt_connected = False
@@ -161,61 +168,56 @@ class DashboardWindow(QWidget):
                 self.console.ensureCursorVisible()
 
     def initUI(self):
-        """Initialize the user interface with a console."""
+        """Initialize the user interface with a console fixed at the bottom."""
         self.setWindowTitle(f'Sarayu Desktop Application - {self.current_project.upper()}')
-        self.showMaximized()
+        self.setWindowState(Qt.WindowMaximized)
 
         # Apply global stylesheet for QInputDialog and QMessageBox
         app = QApplication.instance()
         app.setStyleSheet("""
-    QInputDialog, QMessageBox {
-        background-color: #2c3e50;
-        color: white;
-        font-size: 16px;
-        width: 400px;
-        border: 1px solid #1a252f;
-        border-radius: 8px;
-        padding: 15px;
-    }
-
-    QInputDialog QLineEdit {
-        background-color: #34495e;
-        color: white;
-        border: 1px solid #3498db;
-        padding: 8px;
-        border-radius: 4px;
-        font-size: 15px;
-    }
-
-    QInputDialog QLabel,
-    QMessageBox QLabel {
-        color: #ecf0f1;
-        font-size: 16px;
-        padding-bottom: 10px;
-    }
-
-    QInputDialog QPushButton,
-    QMessageBox QPushButton {
-        background-color: #3498db;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 5px;
-        font-size: 15px;
-        min-width: 80px;
-        transition: background-color 0.2s ease;
-    }
-
-    QInputDialog QPushButton:hover,
-    QMessageBox QPushButton:hover {
-        background-color: #2980b9;
-    }
-
-    QInputDialog QPushButton:pressed,
-    QMessageBox QPushButton:pressed {
-        background-color: #2471a3;
-    }
-""")
+            QInputDialog, QMessageBox {
+                background-color: #1e2937;
+                color: white;
+                font-size: 16px;
+                border: 1px solid #2c3e50;
+                border-radius: 8px;
+                padding: 15px;
+                width:500px;
+            }
+            QInputDialog QLineEdit {
+                background-color: #2c3e50;
+                color: white;
+                border: 1px solid #4a90e2;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 15px;
+            }
+            QInputDialog QLabel,
+            QMessageBox QLabel {
+                color: #ecf0f1;
+                font-size: 16px;
+                padding-bottom: 10px;
+            }
+            QInputDialog QPushButton,
+            QMessageBox QPushButton {
+                background-color: #4a90e2;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 5px;
+                font-size: 15px;
+                min-width: 80px;
+                transition: background-color 0.2s ease;
+            }
+            QInputDialog QPushButton:hover,
+            QMessageBox QPushButton:hover {
+                background-color: #357abd;
+            }
+            QInputDialog QPushButton:pressed,
+            QMessageBox QPushButton:pressed {
+                background-color: #2c5d9b;
+            }
+        """)
 
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
@@ -225,21 +227,21 @@ class DashboardWindow(QWidget):
         self.file_bar = QToolBar("File")
         self.file_bar.setStyleSheet("""
             QToolBar {
-                background-color: #eaeaea;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f5f5f5, stop:1 #e0e0e0);
                 border: none;
                 padding: 0;
                 spacing: 5px;
             }
             QToolBar QToolButton {
-                font-size: 20px;
+                font-size: 18px;
                 font-weight: bold;
-                color: black;
+                color: #333;
                 padding: 8px 12px;
                 border-radius: 4px;
                 background-color: transparent;
             }
             QToolBar QToolButton:hover {
-                background-color: #1976D2;
+                background-color: #4a90e2;
                 color: white;
             }
         """)
@@ -248,16 +250,17 @@ class DashboardWindow(QWidget):
         self.file_bar.setFloatable(False)
 
         actions = [
-            ("Home", self.display_dashboard),
-            ("Open", self.open_project),
-            ("New", self.create_project),
-            ("Save", self.save_action),
-            ("Settings", self.settings_action),
-            ("Refresh", self.refresh_action),
-            ("Exit", self.close)
+            ("Home", "Go to Dashboard Home", self.display_dashboard),
+            ("Open", "Open an Existing Project", self.open_project),
+            ("New", "Create a New Project", self.create_project),
+            ("Save", "Save Current Project Data", self.save_action),
+            ("Settings", "Open Application Settings", self.settings_action),
+            ("Refresh", "Refresh Current View", self.refresh_action),
+            ("Exit", "Exit Application", self.close)
         ]
-        for text, func in actions:
+        for text, tooltip, func in actions:
             action = QAction(text, self)
+            action.setToolTip(tooltip)
             action.triggered.connect(func)
             self.file_bar.addAction(action)
         main_layout.addWidget(self.file_bar)
@@ -270,101 +273,239 @@ class DashboardWindow(QWidget):
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.setContentsMargins(0, 0, 0, 0)
         main_splitter.setHandleWidth(1)
-        main_splitter.setStyleSheet("QSplitter::handle { background-color: #1e2937; }")
+        main_splitter.setStyleSheet("QSplitter::handle { background-color: #2c3e50; }")
         main_layout.addWidget(main_splitter)
 
         self.tree = QTreeWidget()
         self.tree.header().hide()
         self.tree.setStyleSheet("""
-            QTreeWidget { background-color: #1e2937; color: white; border: none; font-size: 16px; }
-            QTreeWidget::item { padding: 8px; border-bottom: 1px solid #34495e; }
-            QTreeWidget::item:hover { background-color: #34495e; }
-            QTreeWidget::item:selected { background-color: #3498db; color: white; }
+            QTreeWidget { 
+                background-color: #1e2937; 
+                color: #ecf0f1; 
+                border: none; 
+                font-size: 16px; 
+            }
+            QTreeWidget::item { 
+                padding: 8px; 
+                border-bottom: 1px solid #2c3e50; 
+            }
+            QTreeWidget::item:hover { 
+                background-color: #34495e; 
+            }
+            QTreeWidget::item:selected { 
+                background-color: #4a90e2; 
+                color: white; 
+            }
         """)
         self.tree.setFixedWidth(250)
         self.tree.itemClicked.connect(self.on_tree_item_clicked)
         main_splitter.addWidget(self.tree)
 
         right_container = QWidget()
-        right_container.setStyleSheet("background-color: #2c3e50;")
+        right_container.setStyleSheet("background-color: #263238;")
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
         right_container.setLayout(right_layout)
 
         subtoolbar_container = QWidget()
-        subtoolbar_container.setStyleSheet("background-color: #1e2937;")
-        subtoolbar_layout = QVBoxLayout()
-        subtoolbar_layout.setContentsMargins(0, 0, 0, 0)
-        subtoolbar_layout.setSpacing(0)
+        subtoolbar_container.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #eceff1, stop:1 #cfd8dc);")
+        subtoolbar_layout = QHBoxLayout()
+        subtoolbar_layout.setContentsMargins(10, 0, 10, 0)
+        subtoolbar_layout.setSpacing(10)
         subtoolbar_container.setLayout(subtoolbar_layout)
 
         self.subtoolbar = QToolBar("Controls")
-        self.subtoolbar.setFixedHeight(60)
-        self.update_subtoolbar()
+        self.subtoolbar.setFixedHeight(100)
+        self.current_feature_label = QLabel("")
+        self.current_feature_label.setStyleSheet("color: #333; font-size: 16px; font-weight: bold;")
+        subtoolbar_layout.addWidget(self.current_feature_label)
         subtoolbar_layout.addWidget(self.subtoolbar)
+        self.update_subtoolbar()
+        right_layout.addWidget(subtoolbar_container)
 
-        content_container = QWidget()
-        content_container.setStyleSheet("background-color: #2c3e50;")
+        # Content container for feature display
+        self.content_container = QWidget()
+        self.content_container.setStyleSheet("background-color: #263238;")
         self.content_layout = QVBoxLayout()
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(0)
-        content_container.setLayout(self.content_layout)
+        self.content_container.setLayout(self.content_layout)
+        right_layout.addWidget(self.content_container, 1)  # Content stretches to fill space
+
+        # Console container with buttons
+        console_container = QWidget()
+        console_layout = QVBoxLayout()
+        console_layout.setContentsMargins(0, 0, 0, 0)
+        console_layout.setSpacing(0)
+        console_container.setLayout(console_layout)
+
+        # Button layout for console controls
+        button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(5)
+
+        # Spacer to push buttons to the right
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        button_layout.addWidget(spacer)
+
+        # Clear console button
+        clear_button = QPushButton("Clear")
+        clear_button.setToolTip("Clear Console Output")
+        clear_button.clicked.connect(self.clear_console)
+        clear_button.setStyleSheet("""
+            QPushButton { 
+                color: white; 
+                font-size: 14px; 
+                padding: 2px 8px; 
+                border-radius: 4px; 
+                background-color: #d32f2f; 
+                border: none;
+            }
+            QPushButton:hover { background-color: #ef5350; }
+            QPushButton:pressed { background-color: #b71c1c; }
+        """)
+        button_layout.addWidget(clear_button)
+
+        # Minimize console button
+        minimize_button = QPushButton("⏷")
+        minimize_button.setToolTip("Minimize Console")
+        minimize_button.clicked.connect(self.minimize_console)
+        minimize_button.setStyleSheet("""
+            QPushButton { 
+                color: white; 
+                font-size: 16px; 
+                padding: 2px 8px; 
+                border-radius: 4px; 
+                background-color: #34495e; 
+                border: none;
+            }
+            QPushButton:hover { background-color: #4a90e2; }
+            QPushButton:pressed { background-color: #357abd; }
+        """)
+        button_layout.addWidget(minimize_button)
+
+        # Maximize console button
+        maximize_button = QPushButton("⏶")
+        maximize_button.setToolTip("Maximize Console")
+        maximize_button.clicked.connect(self.maximize_console)
+        maximize_button.setStyleSheet("""
+            QPushButton { 
+                color: white; 
+                font-size: 16px; 
+                padding: 2px 8px; 
+                border-radius: 4px; 
+                background-color: #34495e; 
+                border: none;
+            }
+            QPushButton:hover { background-color: #4a90e2; }
+            QPushButton:pressed { background-color: #357abd; }
+        """)
+        button_layout.addWidget(maximize_button)
+
+        console_layout.addLayout(button_layout)
 
         self.console = QTextEdit()
         self.console.setReadOnly(True)
-        self.console.setFixedHeight(200)
+        self.console.setFixedHeight(50)  # Initial height for console 
+        
         self.console.setStyleSheet("""
-            QTextEdit { background-color: black; color: white; border: none; font-family: Consolas, monospace; font-size: 14px; padding: 10px; }
+            QTextEdit { 
+                background-color: #212121; 
+                color: #e0e0e0; 
+                border: none; 
+                font-family: Consolas, monospace; 
+                font-size: 14px; 
+                padding: 10px; 
+            }
         """)
+        console_layout.addWidget(self.console)
 
-        right_layout.addWidget(subtoolbar_container)
-        right_layout.addWidget(content_container)
-        right_layout.addWidget(self.console)
+        right_layout.addWidget(console_container, 0)  # Console stays fixed at bottom
 
         main_splitter.addWidget(right_container)
-        main_splitter.setSizes([250, 1000])
+        main_splitter.setSizes([250, 950])
+
+    def clear_console(self):
+        """Clear the console output."""
+        try:
+            self.console.clear()
+            logging.info("Console cleared")
+        except Exception as e:
+            logging.error(f"Error clearing console: {str(e)}")
+
+    def minimize_console(self):
+        """Set console height to 50px."""
+        try:
+            self.console.setFixedHeight(50)
+            logging.info("Console minimized to 50px")
+        except Exception as e:
+            logging.error(f"Error minimizing console: {str(e)}")
+
+    def maximize_console(self):
+        """Set console height to 150px."""
+        try:
+            self.console.setFixedHeight(150)
+            logging.info("Console maximized to 150px")
+        except Exception as e:
+            logging.error(f"Error maximizing console: {str(e)}")
 
     def update_file_bar(self):
-        """Force update and repaint the file bar to prevent glitching."""
+        """Update the file bar stylesheet."""
         try:
             self.file_bar.setStyleSheet("""
                 QToolBar {
-                    background-color: #eaeaea;
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f5f5f5, stop:1 #e0e0e0);
                     border: none;
                     padding: 0;
                     spacing: 5px;
                 }
                 QToolBar QToolButton {
-                    font-size: 20px;
+                    font-size: 18px;
                     font-weight: bold;
-                    color: black;
+                    color: #333;
                     padding: 8px 12px;
                     border-radius: 4px;
                     background-color: transparent;
                 }
                 QToolBar QToolButton:hover {
-                    background-color: #1976D2;
+                    background-color: #4a90e2;
                     color: white;
                 }
             """)
-            self.file_bar.hide()
-            self.file_bar.show()
-            self.file_bar.update()
-            self.file_bar.repaint()
-            QCoreApplication.processEvents()
         except Exception as e:
             logging.error(f"Error updating file bar: {str(e)}")
 
     def update_toolbar(self):
-        """Update the feature toolbar with text-based icons."""
+        """Update the feature toolbar with text-based emoji icons."""
         self.toolbar.clear()
         self.toolbar.setStyleSheet("""
-            QToolBar { background-color: #2c3e50; border: none; padding: 5px; spacing: 10px; }
-            QToolButton { border: none; padding: 10px; border-radius: 6px; background-color: #34495e; font-size: 28px; color: white; }
-            QToolButton:hover { background-color: #3498db; }
-            QToolButton:pressed { background-color: #2980b9; }
-            QToolButton:focus { outline: none; border: 1px solid #0078d7; }
+            QToolBar { 
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #37474f, stop:1 #263238); 
+                border: none; 
+                padding: 5px; 
+                spacing: 10px; 
+            }
+            QToolButton { 
+                border: none; 
+                padding: 10px; 
+                border-radius: 6px; 
+                background-color: #455a64; 
+                font-size: 35px; 
+                color: #eceff1; 
+                transition: background-color 0.3s ease; 
+            }
+            QToolButton:hover { 
+                background-color: #4a90e2; 
+            }
+            QToolButton:pressed { 
+                background-color: #357abd; 
+            }
+            QToolButton:focus { 
+                outline: none; 
+                border: 1px solid #4a90e2; 
+            }
         """)
         self.toolbar.setIconSize(QSize(30, 30))
         self.toolbar.setMovable(False)
@@ -378,24 +519,31 @@ class DashboardWindow(QWidget):
             button = self.toolbar.widgetForAction(action)
             if button:
                 button.setStyleSheet(f"""
-                    QToolButton {{ color: {color}; font-size: 35px; border: none; border-radius: 6px; background-color: #34495e; }}
-                    QToolButton:hover {{ background-color: #3498db; }}
-                    QToolButton:pressed {{ background-color: #2980b9; }}
+                    QToolButton {{ 
+                        color: {color}; 
+                        font-size: 35px; 
+                        border: none; 
+                        border-radius: 6px; 
+                        background-color: #455a64; 
+                        transition: background-color 0.3s ease; 
+                    }}
+                    QToolButton:hover {{ background-color: #4a90e2; }}
+                    QToolButton:pressed {{ background-color: #357abd; }}
                 """)
 
         feature_actions = [
-            ("Create Tags", "🏷️", "#00cc00", "Access Create Tags Feature"),
-            ("Time View", "⏱️", "#ff9900", "Access Time View Feature"),
-            ("Tabular View", "📋", "#3399ff", "Access Tabular View Feature"),
-            ("Time Report", "📄", "#33cc99", "Access Time Report Feature"),
-            ("FFT", "📈", "#cc33ff", "Access FFT View Feature"),
-            ("Waterfall", "🌊", "#00cccc", "Access Waterfall Feature"),
-            ("Orbit", "🪐", "#ff66cc", "Access Orbit Feature"),
-            ("Trend View", "📉", "#66cc00", "Access Trend View Feature"),
-            ("Multiple Trend View", "📊", "#cc6600", "Access Multiple Trend View Feature"),
-            ("Bode Plot", "🔍", "#6666ff", "Access Bode Plot Feature"),
-            ("History Plot", "🕰️", "#ff3333", "Access History Plot Feature"),
-            ("Report", "📝", "#9933cc", "Access Report Feature"),
+            ("Create Tags", "🏷️", "#81c784", "Access Create Tags Feature"),
+            ("Time View", "⏱️", "#ffb300", "Access Time View Feature"),
+            ("Tabular View", "📋", "#64b5f6", "Access Tabular View Feature"),
+            ("Time Report", "📄", "#4db6ac", "Access Time Report Feature"),
+            ("FFT", "📈", "#ba68c8", "Access FFT View Feature"),
+            ("Waterfall", "🌊", "#4dd0e1", "Access Waterfall Feature"),
+            ("Orbit", "🪐", "#f06292", "Access Orbit Feature"),
+            ("Trend View", "📉", "#aed581", "Access Trend View Feature"),
+            ("Multiple Trend View", "📊", "#ff8a65", "Access Multiple Trend View Feature"),
+            ("Bode Plot", "🔍", "#7986cb", "Access Bode Plot Feature"),
+            ("History Plot", "🕰️", "#ef5350", "Access History Plot Feature"),
+            ("Report", "📝", "#ab47bc", "Access Report Feature"),
         ]
 
         for feature_name, text_icon, color, tooltip in feature_actions:
@@ -404,25 +552,42 @@ class DashboardWindow(QWidget):
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.toolbar.addWidget(spacer)
-        self.toolbar.hide()
-        self.toolbar.show()
-        self.toolbar.update()
-        self.toolbar.repaint()
-        self.update_file_bar()
 
     def update_subtoolbar(self):
-        """Update the subtoolbar with play/pause and MQTT controls."""
+        """Update the subtoolbar with play/pause, MQTT controls, and current feature label."""
         self.subtoolbar.clear()
         self.subtoolbar.setStyleSheet("""
-            QToolBar { background-color: #1e2937; border: none; padding: 5px; spacing: 10px; }
-            QToolButton { border: none; padding: 8px; border-radius: 5px; background-color: #2c3e50; font-size: 24px; color: white; }
-            QToolButton:hover { background-color: #3498db; }
-            QToolButton:pressed { background-color: #2980b9; }
-            QToolButton:focus { outline: none; border: 1px solid #0078d7; }
-            QToolButton:disabled { background-color: #555555; color: #888888; }
+            QToolBar { 
+                background: transparent; 
+                border: none; 
+                padding: 5px; 
+                spacing: 10px; 
+            }
+            QToolButton { 
+                border: none; 
+                padding: 8px; 
+                border-radius: 5px; 
+                background-color: #90a4ae; 
+                font-size: 24px; 
+                color: white; 
+                transition: background-color 0.3s ease; 
+            }
+            QToolButton:hover { 
+                background-color: #4a90e2; 
+            }
+            QToolButton:pressed { 
+                background-color: #357abd; 
+            }
+            QToolButton:focus { 
+                outline: none; 
+                border: 1px solid #4a90e2; 
+            }
+            QToolButton:disabled { 
+                background-color: #546e7a; 
+                color: #b0bec5; 
+            }
         """)
         self.subtoolbar.setIconSize(QSize(25, 25))
-        self.subtoolbar.setContentsMargins(10, 0, 10, 0)
         self.subtoolbar.setMovable(False)
         self.subtoolbar.setFloatable(False)
 
@@ -435,34 +600,33 @@ class DashboardWindow(QWidget):
             button = self.subtoolbar.widgetForAction(action)
             if button:
                 button.setStyleSheet(f"""
-                    QToolButton {{ color: {color}; font-size: 28px; border: none; padding: 8px; border-radius: 5px; background-color: {background_color}; }}
-                    QToolButton:hover {{ background-color: #3498db; }}
-                    QToolButton:pressed {{ background-color: #2980b9; }}
-                    QToolButton:disabled {{ background-color: #555555; color: #888888; }}
+                    QToolButton {{ 
+                        color: {color}; 
+                        font-size: 24px; 
+                        border: none; 
+                        padding: 8px; 
+                        border-radius: 5px; 
+                        background-color: {background_color}; 
+                        transition: background-color 0.3s ease; 
+                    }}
+                    QToolButton:hover {{ background-color: #4a90e2; }}
+                    QToolButton:pressed {{ background-color: #357abd; }}
+                    QToolButton:disabled {{ background-color: #546e7a; color: #b0bec5; }}
                 """)
 
         is_time_view = self.current_feature == "Time View"
-        add_action("▶️", "#00ff00", self.start_saving, "Start Saving Data (Time View)", is_time_view and not self.is_saving, "#2c3e50")
-        add_action("⏸️", "#ff3333", self.stop_saving, "Stop Saving Data (Time View)", is_time_view and self.is_saving, "#2c3e50")
+        add_action("▶", "#ffffff", self.start_saving, "Start Saving Data (Time View)", is_time_view and not self.is_saving, "#43a047")
+        add_action("⏸", "#ffffff", self.stop_saving, "Stop Saving Data (Time View)", is_time_view and self.is_saving, "#ef5350")
         self.subtoolbar.addSeparator()
         
-        connect_bg = "green" if self.mqtt_connected else "#2c3e50"
-        disconnect_bg = "red" if not self.mqtt_connected else "#2c3e50"
-        # add_action("🔗", "#ffffff", self.connect_mqtt, "Connect to MQTT", not self.mqtt_connected, connect_bg)
-        # add_action("🔌", "#ffffff", self.disconnect_mqtt, "Disconnect from MQTT", self.mqtt_connected, disconnect_bg)
+        connect_bg = "#43a047" if self.mqtt_connected else "#90a4ae"
+        disconnect_bg = "#ef5350" if not self.mqtt_connected else "#90a4ae"
         add_action("🟢", "#ffffff", self.connect_mqtt, "Connect to MQTT", not self.mqtt_connected, connect_bg)
         add_action("🔴", "#ffffff", self.disconnect_mqtt, "Disconnect from MQTT", self.mqtt_connected, disconnect_bg)
-
 
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.subtoolbar.addWidget(spacer)
-        self.subtoolbar.hide()
-        self.subtoolbar.show()
-        self.subtoolbar.update()
-        self.subtoolbar.repaint()
-        QCoreApplication.processEvents()
-        self.update_file_bar()
 
     def load_project_features(self):
         """Load features for the current project into the tree."""
@@ -478,8 +642,6 @@ class DashboardWindow(QWidget):
                     self.tree.setCurrentItem(item)
                     self.tree.scrollToItem(item)
                     break
-            QCoreApplication.processEvents()
-            self.update_file_bar()
         except Exception as e:
             logging.error(f"Failed to load project features: {str(e)}")
             QMessageBox.warning(self, "Error", f"Failed to load project features: {str(e)}")
@@ -491,23 +653,24 @@ class DashboardWindow(QWidget):
         project_item.setData(0, Qt.UserRole, {"type": "project", "name": project_name})
 
         features = [
-            ("Create Tags", "🏷️"),
-            ("Time View", "⏱️"),
-            ("Tabular View", "📋"),
-            ("FFT", "📈"),
-            ("Waterfall", "🌊"),
-            ("Orbit", "🪐"),
-            ("Trend View", "📉"),
-            ("Multiple Trend View", "📊"),
-            ("Bode Plot", "🔍"),
-            ("History Plot", "🕰️"),
-            ("Time Report", "📄"),
-            ("Report", "📝")
+            ("Create Tags", "🏷️ Create Tags", "Access Create Tags Feature"),
+            ("Time View", "⏱️ Time View", "Access Time View Feature"),
+            ("Tabular View", "📋 Tabular View", "Access Tabular View Feature"),
+            ("FFT", "📈 FFT", "Access FFT View Feature"),
+            ("Waterfall", "🌊 Waterfall", "Access Waterfall Feature"),
+            ("Orbit", "🪐 Orbit", "Access Orbit Feature"),
+            ("Trend View", "📉 Trend View", "Access Trend View Feature"),
+            ("Multiple Trend View", "📊 Multiple Trend View", "Access Multiple Trend View Feature"),
+            ("Bode Plot", "🔍 Bode Plot", "Access Bode Plot Feature"),
+            ("History Plot", "🕰️ History Plot", "Access History Plot Feature"),
+            ("Time Report", "📄 Time Report", "Access Time Report Feature"),
+            ("Report", "📝 Report", "Access Report Feature")
         ]
 
-        for feature, text_icon in features:
+        for feature, text_icon, tooltip in features:
             feature_item = QTreeWidgetItem(project_item)
-            feature_item.setText(0, f"{text_icon} {feature}")
+            feature_item.setText(0, text_icon)
+            feature_item.setToolTip(0, tooltip)
             feature_item.setData(0, Qt.UserRole, {"type": "feature", "name": feature, "project": project_name})
 
     def on_tree_item_clicked(self, item, column):
@@ -666,13 +829,16 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Failed to stop saving: {str(e)}")
 
     def display_feature_content(self, feature_name, project_name):
-        """Display the content for a selected feature with delayed rendering."""
+        """Display the content for a selected feature within the main window."""
         def render_feature():
             try:
                 self.current_project = project_name
                 self.current_feature = feature_name
                 self.is_saving = False
                 self.update_subtoolbar()
+
+                # Store current console height to restore after rendering
+                current_console_height = self.console.height()
 
                 # Clear the layout and remove old widgets
                 self.clear_content_layout()
@@ -683,12 +849,16 @@ class DashboardWindow(QWidget):
                     try:
                         widget = feature_instance.get_widget()
                         if widget and not widget.isHidden():
-                            self.content_layout.addWidget(widget)
-                            widget.show()
-                            self.update()
-                            self.repaint()
-                            QCoreApplication.processEvents()
-                            self.update_file_bar()
+                            if feature_name in ["FFT", "Waterfall"]:
+                                widget.setFixedSize(400, 400)
+                                widget.move(50, 50)  # Initial position
+                                widget.setParent(self.content_container)
+                                widget.show()
+                            else:
+                                self.content_layout.addWidget(widget)
+                                widget.show()
+                            # Restore console height
+                            self.console.setFixedHeight(current_console_height)
                             return
                     except RuntimeError:
                         # Widget was deleted, remove the instance
@@ -701,14 +871,14 @@ class DashboardWindow(QWidget):
                     "Tabular View": TabularViewFeature,
                     "Time View": TimeViewFeature,
                     "Time Report": TimeReportFeature,
-                #     "FFT": FFTViewFeature,
-                #     "Waterfall": WaterfallFeature,
-                #     "Orbit": OrbitFeature,
-                #     "Trend View": TrendViewFeature,
-                #     "Multiple Trend View": MultiTrendFeature,
-                #     "Bode Plot": BodePlotFeature,
-                #     "History Plot": HistoryPlotFeature,
-                #     "Report": ReportFeature
+                    "FFT": FFTViewFeature,
+                    "Waterfall": WaterfallFeature,
+                    "Orbit": OrbitFeature,
+                    "Trend View": TrendViewFeature,
+                    "Multiple Trend View": MultiTrendFeature,
+                    "Bode Plot": BodePlotFeature,
+                    "History Plot": HistoryPlotFeature,
+                    "Report": ReportFeature
                 }
 
                 if feature_name in feature_classes:
@@ -719,12 +889,16 @@ class DashboardWindow(QWidget):
                         self.feature_instances[feature_name] = feature_instance
                         widget = feature_instance.get_widget()
                         if widget:
-                            self.content_layout.addWidget(widget)
-                            widget.show()
-                            self.update()
-                            self.repaint()
-                            QCoreApplication.processEvents()
-                            self.update_file_bar()
+                            if feature_name in ["FFT", "Waterfall"]:
+                                widget.setFixedSize(400, 400)
+                                widget.move(50, 50)  # Initial position
+                                widget.setParent(self.content_container)
+                                widget.show()
+                            else:
+                                self.content_layout.addWidget(widget)
+                                widget.show()
+                            # Restore console height
+                            self.console.setFixedHeight(current_console_height)
                         else:
                             logging.error(f"Feature {feature_name} returned invalid widget")
                             QMessageBox.warning(self, "Error", f"Feature {feature_name} failed to initialize")
@@ -738,11 +912,11 @@ class DashboardWindow(QWidget):
                 logging.error(f"Error displaying feature content: {str(e)}")
                 QMessageBox.warning(self, "Error", f"Error displaying feature: {str(e)}")
             finally:
-                self.update()
-                self.repaint()
+                # Ensure console height is preserved
+                self.console.setFixedHeight(current_console_height)
 
-        # Use a longer delay to allow UI to stabilize
-        QTimer.singleShot(150, render_feature)
+        # Use a short delay to allow UI to stabilize
+        QTimer.singleShot(50, render_feature)
 
     def save_action(self):
         """Save the current project's data."""
@@ -800,6 +974,15 @@ class DashboardWindow(QWidget):
                     except Exception as e:
                         logging.error(f"Error deleting widget: {str(e)}")
 
+            # Hide and remove any floating widgets in content_container
+            for child in self.content_container.findChildren(QWidget):
+                child.hide()
+                child.setParent(None)
+                try:
+                    child.deleteLater()
+                except Exception as e:
+                    logging.error(f"Error deleting child widget: {str(e)}")
+
             # Clean up feature instances
             for feature_name in list(self.feature_instances.keys()):
                 try:
@@ -814,21 +997,14 @@ class DashboardWindow(QWidget):
                     del self.feature_instances[feature_name]
                 except Exception as e:
                     logging.error(f"Error cleaning up feature instance {feature_name}: {str(e)}")
-            self.feature_instances.clear()
 
             # Force garbage collection to release memory
             gc.collect()
-
-            # Force UI update
-            QCoreApplication.processEvents()
-            self.update()
-            self.repaint()
-            self.update_file_bar()
         except Exception as e:
             logging.error(f"Error clearing content layout: {str(e)}")
 
     def settings_action(self):
-        """Display settings (not implemented)."""
+        """Display greeting settings (not implemented)."""
         QMessageBox.information(self, "Settings", "Settings functionality not implemented yet.")
         self.update_file_bar()
 
@@ -843,7 +1019,6 @@ class DashboardWindow(QWidget):
                 self.db.close_connection()
             if self.current_project in self.project_selection_window.open_dashboards:
                 del self.project_selection_window.open_dashboards[self.current_project]
-            QCoreApplication.processEvents()
             app = QApplication.instance()
             if app:
                 app.quit()
