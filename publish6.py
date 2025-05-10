@@ -14,7 +14,7 @@ class MQTTPublisher(QObject):
         self.topics = topics if isinstance(topics, list) else [topics]
         self.count = 0
 
-        self.frequency = 10
+        self.frequency = 15
         self.amplitude = (46537 - 16390) / 2
         self.offset = (46537 + 16390) / 2
 

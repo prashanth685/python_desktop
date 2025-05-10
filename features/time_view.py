@@ -1,8 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QHBoxLayout, QComboBox, 
                             QScrollArea, QPushButton, QMessageBox)
 from PyQt5.QtCore import Qt, QTimer
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import matplotlib.pyplot as plt
+import pyqtgraph as pg
 import numpy as np
 from datetime import datetime, timedelta
 from collections import deque
@@ -24,8 +23,8 @@ class TimeViewFeature:
         self.time_view_timestamps = deque(maxlen=self.buffer_size)
         self.timer = QTimer(self.widget)
         self.timer.timeout.connect(self.update_time_view_plot)
-        self.figure = plt.Figure(figsize=(10, 6))
-        self.canvas = FigureCanvas(self.figure)
+        self.plot_widgets = []  # List to hold separate PlotWidgets for each channel
+        self.plots = []  # List to hold the plot items for each channel
         self.last_data_time = None
         self.is_saving = False
         self.frame_index = 0
@@ -65,7 +64,7 @@ class TimeViewFeature:
         self.header = header
         control_layout.addWidget(header, alignment=Qt.AlignCenter)
 
-        # Tag selection row - Mimic flex with proper alignment
+        # Tag selection row
         tag_layout = QHBoxLayout()
         tag_label = QLabel("Select Tag:")
         tag_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold; margin-right: 15px;")
@@ -126,11 +125,11 @@ class TimeViewFeature:
 
         tag_layout.addWidget(tag_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         tag_layout.addWidget(self.tag_combo, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        tag_layout.addStretch()  # Push content to the left, mimic flex-start
+        tag_layout.addStretch()
         tag_layout.setSpacing(0)
         control_layout.addLayout(tag_layout)
 
-        # Save controls row - Align elements with proper spacing
+        # Save controls row
         save_layout = QHBoxLayout()
         filename_label = QLabel("Saving File:")
         filename_label.setStyleSheet("color: white; font-size: 16px; font-weight: bold; margin-right: 15px;")
@@ -218,7 +217,6 @@ class TimeViewFeature:
             QPushButton::pressed {
                 background-color: red;
             }
-
         """)
         self.stop_save_button.clicked.connect(self.stop_saving)
         self.stop_save_button.setEnabled(False)
@@ -231,11 +229,11 @@ class TimeViewFeature:
         save_layout.addWidget(self.start_save_button, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         save_layout.addWidget(self.stop_save_button, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         save_layout.addWidget(self.timer_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        save_layout.addStretch()  # Push content to the left
+        save_layout.addStretch()
         save_layout.setSpacing(0)
         control_layout.addLayout(save_layout)
 
-        # Time info row - Distribute elements evenly
+        # Time info row
         time_info_layout = QHBoxLayout()
         self.start_time_label = QLabel("Start Time: N/A")
         self.start_time_label.setStyleSheet("color: white; font-size: 14px; font-weight: 500;")
@@ -247,12 +245,12 @@ class TimeViewFeature:
         time_info_layout.addWidget(self.start_time_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         time_info_layout.addWidget(self.end_time_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
         time_info_layout.addWidget(self.latest_filename_label, alignment=Qt.AlignLeft | Qt.AlignVCenter)
-        time_info_layout.addStretch()  # Push content to the left
+        time_info_layout.addStretch()
         time_info_layout.setSpacing(0)
         control_layout.addLayout(time_info_layout)
 
-        control_layout.setSpacing(15)  # Consistent spacing between sections
-        control_layout.setContentsMargins(0, 0, 0, 0)  # Remove extra margins
+        control_layout.setSpacing(15)
+        control_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.addWidget(control_widget)
 
         # Scrollable graph area
@@ -261,13 +259,11 @@ class TimeViewFeature:
         self.graph_widget.setLayout(self.graph_layout)
         self.graph_widget.setStyleSheet("background-color: #2c3e50; border: 1px solid #ffffff; border-radius: 5px; padding: 8px;")
 
-        self.graph_layout.addWidget(self.canvas)
-
         scroll_area = QScrollArea()
         scroll_area.setWidget(self.graph_widget)
         scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # Disable horizontal scrollbar
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)    # Enable vertical scrollbar when needed
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setStyleSheet("""
             QScrollArea {
                 border: none;
@@ -292,7 +288,7 @@ class TimeViewFeature:
                 background: none;
             }
         """)
-        scroll_area.setMinimumHeight(300)  # Reasonable height for the graph area
+        scroll_area.setMinimumHeight(300)
         main_layout.addWidget(scroll_area)
 
         if tags_data:
@@ -363,7 +359,6 @@ class TimeViewFeature:
         self.save_timer.stop()
         stop_time = datetime.now()
         self.save_end_time = stop_time
-        duration = stop_time - self.save_start_time if self.save_start_time else timedelta(0)
         self.parent.is_saving = False
         filename = f"data{self.filename_counter}"
         self.filename_counter += 1
@@ -384,8 +379,11 @@ class TimeViewFeature:
             logging.warning("No project or valid tag selected for Time View!")
             self.parent.append_to_console("No project or valid tag selected for Time View!")
             self.timer.stop()
-            self.figure.clear()
-            self.canvas.draw()
+            # Clear existing plot widgets
+            for i in reversed(range(self.graph_layout.count())):
+                self.graph_layout.itemAt(i).widget().setParent(None)
+            self.plot_widgets = []
+            self.plots = []
             return
 
         self.mqtt_tag = tag_name
@@ -395,8 +393,8 @@ class TimeViewFeature:
         self.time_view_timestamps.clear()
         self.last_data_time = None
         self.num_channels = 0
-        self.axes = []
-        self.lines = []
+        self.plots = []
+        self.plot_widgets = []
         self.is_saving = False
         self.start_save_button.setEnabled(True)
         self.stop_save_button.setEnabled(False)
@@ -410,44 +408,49 @@ class TimeViewFeature:
         self.frame_index = 0
         self.parent.is_saving = False
 
-        self.figure.clear()
-        self.canvas.draw()
+        # Clear existing plot widgets
+        for i in reversed(range(self.graph_layout.count())):
+            self.graph_layout.itemAt(i).widget().setParent(None)
+        self.plot_widgets = []
+        self.plots = []
+
         self.timer.start()
         logging.info(f"Initialized plot setup for tag {self.mqtt_tag}, buffer size: {self.buffer_size}")
         self.parent.append_to_console(f"Initialized plot setup for tag {self.mqtt_tag}")
 
     def initialize_plot(self, num_channels):
-        if num_channels == self.num_channels and self.axes:
+        if num_channels == self.num_channels and self.plots:
             return
 
         self.num_channels = num_channels
         self.buffer_size = int(self.data_rate * self.window_size)
         self.time_view_buffers = [deque(maxlen=self.buffer_size) for _ in range(num_channels)]
         self.time_view_timestamps = deque(maxlen=self.buffer_size)
-        self.figure.clear()
-        self.axes = []
-        self.lines = []
 
-        self.figure.set_size_inches(10, 3 * num_channels)  # Height scales with number of channels
+        # Clear existing plot widgets
+        for i in reversed(range(self.graph_layout.count())):
+            self.graph_layout.itemAt(i).widget().setParent(None)
+        self.plot_widgets = []
+        self.plots = []
 
+        # Create a separate PlotWidget for each channel
+        colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
         for i in range(num_channels):
-            ax = self.figure.add_subplot(num_channels, 1, i+1)
-            line, = ax.plot([], [], f'C{i}-', linewidth=1.5)
-            self.lines.append(line)
-            self.axes.append(ax)
-            ax.grid(True, linestyle='--', alpha=0.7)
-            ax.set_ylabel(f"Channel {i+1}", rotation=0, labelpad=40, fontweight='bold')
-            ax.yaxis.set_label_position("right")
-            ax.yaxis.tick_right()
-            ax.set_xlabel("Time (s)")
-            ax.set_xlim(0, self.window_size)
-            ax.set_ylim(0, 65535)
-            ax.set_xticks(np.linspace(0, self.window_size, 11))
+            plot_widget = pg.PlotWidget()
+            plot_widget.setBackground('w')
+            plot_widget.showGrid(x=True, y=True, alpha=0.7)
+            plot_widget.setXRange(0, self.window_size)
+            plot_widget.setYRange(0, 65535)
+            plot_widget.setLabel('bottom', 'Time (s)')
+            plot_widget.setLabel('right', f'Channel {i+1}')
+            plot_widget.getAxis('right').setStyle(tickTextOffset=10)
+            plot_widget.getAxis('left').setStyle(showValues=False)
+            plot = plot_widget.plot(pen=pg.mkPen(color=colors[i % len(colors)], width=1.5))
+            self.plots.append(plot)
+            self.plot_widgets.append(plot_widget)
+            self.graph_layout.addWidget(plot_widget)
 
-        self.figure.subplots_adjust(left=0.05, right=0.85, top=0.95, bottom=0.15, hspace=0.4)
-        self.canvas.setMinimumSize(1000, 300 * num_channels)
         self.graph_widget.setMinimumSize(1000, 300 * num_channels)
-        self.canvas.draw()
         logging.info(f"Initialized {num_channels} subplots for tag {self.mqtt_tag}")
         self.parent.append_to_console(f"Initialized {num_channels} subplots for tag {self.mqtt_tag}")
 
@@ -474,7 +477,7 @@ class TimeViewFeature:
                 self.parent.append_to_console(f"Unexpected number of plot values: {len(plot_values)}")
                 return
 
-            if number_of_channels != self.num_channels or not self.axes:
+            if number_of_channels != self.num_channels or not self.plots:
                 self.initialize_plot(number_of_channels)
 
             num_samples = len(plot_values) // number_of_channels
@@ -541,10 +544,8 @@ class TimeViewFeature:
             self.time_view_timestamps = deque(self.time_view_timestamps, maxlen=self.buffer_size)
             logging.info(f"Adjusted buffer size to {self.buffer_size}")
             self.parent.append_to_console(f"Adjusted buffer size to {self.buffer_size}")
-            for ax in self.axes:
-                ax.set_xlim(0, self.window_size)
-                ax.set_xticks(np.linspace(0, self.window_size, 11))
-            self.canvas.draw()
+            for widget in self.plot_widgets:
+                widget.setXRange(0, self.window_size)
 
     def generate_y_ticks(self, values):
         if not values or not all(np.isfinite(v) for v in values):
@@ -560,7 +561,7 @@ class TimeViewFeature:
         return ticks
 
     def update_time_view_plot(self):
-        if not self.project_name or not self.mqtt_tag or not self.axes or not self.time_view_buffers:
+        if not self.project_name or not self.mqtt_tag or not self.plots or not self.time_view_buffers:
             return
 
         current_buffer_size = len(self.time_view_buffers[0]) if self.time_view_buffers else 0
@@ -569,20 +570,21 @@ class TimeViewFeature:
 
         self.adjust_buffer_size()
 
-        for i, (ax, line) in enumerate(zip(self.axes, self.lines)):
+        for i, (plot_widget, plot) in enumerate(zip(self.plot_widgets, self.plots)):
             window_values = list(self.time_view_buffers[i])
             window_timestamps = list(self.time_view_timestamps)
 
             if not window_values or not all(np.isfinite(v) for v in window_values):
-                ax.set_ylim(0, 65535)
-                ax.set_yticks(self.generate_y_ticks([]))
-                line.set_data([], [])
+                plot.setData([], [])
+                plot_widget.setYRange(0, 65535)
+                plot_widget.getAxis('right').setTicks([[(v, str(int(v))) for v in np.arange(0, 65536, 10000)]])
                 continue
 
             time_points = np.linspace(0, self.window_size, len(window_values))
-            line.set_data(time_points, window_values)
-            ax.set_ylim(min(window_values) - 1000, max(window_values) + 1000)
-            ax.set_yticks(self.generate_y_ticks(window_values))
+            plot.setData(time_points, window_values)
+            y_ticks = self.generate_y_ticks(window_values)
+            plot_widget.setYRange(min(window_values) - 1000, max(window_values) + 1000)
+            plot_widget.getAxis('right').setTicks([[(v, str(int(v))) for v in y_ticks]])
 
             if window_timestamps:
                 try:
@@ -591,17 +593,14 @@ class TimeViewFeature:
                     if isinstance(start_time, datetime) and isinstance(end_time, datetime):
                         tick_positions = np.linspace(0, self.window_size, 11)
                         time_labels = [
-                            (start_time + timedelta(seconds=pos)).strftime('%H:%M:%S.%f')[:-3] + '\n' +
-                            (start_time + timedelta(seconds=pos)).strftime('%d-%m-%Y')
+                            (start_time + timedelta(seconds=pos)).strftime('%H:%M:%S.%f')[:-3]
                             for pos in tick_positions
                         ]
-                        ax.set_xticks(tick_positions)
-                        ax.set_xticklabels(time_labels, rotation=0, ha='left', fontsize=10)
+                        axis = plot_widget.getAxis('bottom')
+                        axis.setTicks([[(pos, label) for pos, label in zip(tick_positions, time_labels)]])
                 except Exception as e:
-                    logging.error(f"Error setting x-ticks: {e}")
+                    logging.error(f"Error setting x-ticks for channel {i+1}: {e}")
                     self.parent.append_to_console(f"Error setting x-ticks: {str(e)}")
-
-        self.canvas.draw()
 
     def on_data_received(self, tag_name, values):
         if tag_name != self.mqtt_tag:
