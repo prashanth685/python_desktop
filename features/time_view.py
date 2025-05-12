@@ -434,7 +434,7 @@ class TimeViewFeature:
         self.plots = []
 
         # Create a separate PlotWidget for each channel
-        colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+        colors = ['b', 'g', 'r', 'm', 'c', 'y', 'k']
         for i in range(num_channels):
             plot_widget = pg.PlotWidget()
             plot_widget.setBackground('w')

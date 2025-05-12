@@ -2,9 +2,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabe
 from PyQt5.QtCore import QPropertyAnimation, QEasingCurve
 from PyQt5.QtCore import Qt, QDateTime, QRect, pyqtSignal
 from PyQt5.QtGui import QPainter, QPen, QBrush, QColor
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
+import pyqtgraph as pg
 import numpy as np
 from datetime import datetime, timedelta
 import logging
@@ -109,10 +107,11 @@ class TimeReportFeature:
         self.db = db
         self.project_name = project_name
         self.widget = QWidget(self.parent)
-        self.figure = plt.Figure(figsize=(10, 6))
-        self.canvas = FigureCanvas(self.figure)
+        self.plot_widget = pg.GraphicsLayoutWidget()  # PyQtGraph widget
         self.file_start_time = None
         self.file_end_time = None
+        self.window_size = 1.0  # Default window size, matching TimeViewFeature
+        self.data_rate = 4096.0  # Default data rate, matching TimeViewFeature
         self.initUI()
 
     def animate_button_press(self):
@@ -272,8 +271,8 @@ class TimeReportFeature:
         graph_container.setLayout(graph_layout)
         graph_container.setStyleSheet("background-color: #2c3e50; border-radius: 5px; padding: 10px;")
 
-        # Add the canvas to the graph layout
-        graph_layout.addWidget(self.canvas)
+        # Add the PyQtGraph widget to the graph layout
+        graph_layout.addWidget(self.plot_widget)
 
         # Create a QScrollArea for the graph only
         scroll_area = QScrollArea()
@@ -303,8 +302,11 @@ class TimeReportFeature:
                 background: none;
             }
         """)
-        # Ensure the scroll area takes the remaining space
         layout.addWidget(scroll_area, stretch=1)
+
+        # Configure PyQtGraph appearance
+        pg.setConfigOptions(antialias=True)
+        self.plot_widget.setBackground('white')
 
         self.refresh_filenames()
 
@@ -321,8 +323,7 @@ class TimeReportFeature:
                 self.end_time_edit.setEnabled(False)
                 self.time_slider.setEnabled(False)
                 self.ok_button.setEnabled(False)
-                self.figure.clear()
-                self.canvas.draw()
+                self.plot_widget.clear()
             else:
                 for filename in filenames:
                     self.file_combo.addItem(filename)
@@ -341,8 +342,7 @@ class TimeReportFeature:
             self.end_time_edit.setEnabled(False)
             self.time_slider.setEnabled(False)
             self.ok_button.setEnabled(False)
-            self.figure.clear()
-            self.canvas.draw()
+            self.plot_widget.clear()
 
     def update_time_labels(self, filename):
         if not filename or filename in ["No Files Available", "Error Loading Files"]:
@@ -468,23 +468,34 @@ class TimeReportFeature:
                     self.time_slider.setValues(left_pos, right_pos)
                     self.time_slider.blockSignals(False)
 
+    def generate_y_ticks(self, values):
+        if not values or not all(np.isfinite(v) for v in values):
+            return np.arange(0, 65536, 10000)
+        y_max = max(values)
+        y_min = min(values)
+        padding = (y_max - y_min) * 0.1 if y_max != y_min else 1000
+        y_max += padding
+        y_min -= padding
+        step = (y_max - y_min) / 10
+        step = np.ceil(step / 500) * 500
+        ticks = np.arange(np.floor(y_min / step) * step, y_max + step, step)
+        return ticks
+
     def plot_data(self):
         filename = self.file_combo.currentText()
         if not filename or filename in ["No Files Available", "Error Loading Files"]:
             self.parent.append_to_console("No valid file selected to plot.")
-            self.figure.clear()
-            self.canvas.draw()
+            self.plot_widget.clear()
             return
 
         start_time = self.start_time_edit.dateTime().toPyDateTime()
         end_time = self.end_time_edit.dateTime().toPyDateTime()
         if start_time >= end_time:
             self.parent.append_to_console("Error: Start time must be before end time.")
-            self.figure.clear()
-            self.canvas.draw()
+            self.plot_widget.clear()
             return
 
-        self.figure.clear()
+        self.plot_widget.clear()
         try:
             data = list(self.db.timeview_collection.find(
                 {"filename": filename, "project_name": self.project_name}
@@ -492,16 +503,14 @@ class TimeReportFeature:
             
             if not data:
                 self.parent.append_to_console(f"No data found for file: {filename}")
-                self.figure.clear()
-                self.canvas.draw()
+                self.plot_widget.clear()
                 return
 
             num_channels = data[0].get("numberOfChannels", 1)
-            data_rate = data[0].get("samplingRate", 4096.0)
+            data_rate = data[0].get("samplingRate", self.data_rate)
             if not isinstance(num_channels, int) or num_channels < 1:
                 self.parent.append_to_console(f"Invalid number of channels ({num_channels}) for file: {filename}")
-                self.figure.clear()
-                self.canvas.draw()
+                self.plot_widget.clear()
                 return
 
             channel_values = [[] for _ in range(num_channels)]
@@ -515,15 +524,24 @@ class TimeReportFeature:
                     logging.warning(f"Empty message in frame {item.get('frameIndex')} for {filename}")
                     self.parent.append_to_console(f"Warning: Empty message in frame {item.get('frameIndex')} for {filename}")
                     continue
-                
+            
+
                 try:
                     created_at = item.get("createdAt")
                     if not created_at:
                         raise ValueError("Missing createdAt field")
-                    timestamp = datetime.fromisoformat(created_at.replace('Z', '+00:00')) if 'Z' in created_at else datetime.fromisoformat(created_at)
+
+                    # Handle ISO 8601 with 'Z' (Zulu time) by replacing it with '+00:00'
+                    if created_at.endswith('Z'):
+                        timestamp = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                    else:
+                        timestamp = datetime.fromisoformat(created_at)
+                        
                 except Exception as e:
                     logging.error(f"Invalid createdAt timestamp in frame {item.get('frameIndex')}: {e}")
-                    self.parent.append_to_console(f"Error: Invalid timestamp in frame {item.get('frameIndex')} for {filename}")
+                    self.parent.append_to_console(
+                        f"Error: Invalid timestamp in frame {item.get('frameIndex')} for {filename}"
+                    )
                     continue
 
                 if timestamp < start_time or timestamp > end_time:
@@ -551,55 +569,64 @@ class TimeReportFeature:
 
             if not time_points or not any(channel_values):
                 self.parent.append_to_console(f"No data found in the selected time range for file: {filename}")
-                self.figure.clear()
-                self.canvas.draw()
+                self.plot_widget.clear()
                 return
 
-            axes = []
-            lines = []
-            window_size = max(time_points) if time_points else 1.0
+            # Custom axis for time formatting
+            class TimeAxisItem(pg.AxisItem):
+                def __init__(self, start_time, *args, **kwargs):
+                    super().__init__(*args, **kwargs)
+                    self.start_time = start_time
 
-            def time_formatter(x, pos):
-                actual_time = start_time + timedelta(seconds=x)
-                return actual_time.strftime('%H:%M:%S:%f')[:-3] + '\n' + actual_time.strftime('%d-%m-%Y')
+                def tickStrings(self, values, scale, spacing):
+                    return [(self.start_time + timedelta(seconds=v)).strftime('%H:%M:%S.%f')[:-3] for v in values]
+
+            plots = []
+            window_size = max(time_points) if time_points else self.window_size
+            colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 
             for channel in range(num_channels):
-                ax = self.figure.add_subplot(num_channels, 1, channel + 1)
                 if channel_values[channel]:
-                    line, = ax.plot(time_points, channel_values[channel], f'C{channel}-', linewidth=1.5)
-                    lines.append(line)
-                    ax.grid(True, linestyle='--', alpha=0.7)
-                    ax.set_ylabel(f"Channel {channel + 1}", rotation=0, labelpad=40, fontweight='bold')
-                    ax.yaxis.set_label_position("right")
-                    ax.yaxis.tick_right()
-                    ax.set_xlim(0, window_size)
-
+                    # Create a plot item
+                    plot = self.plot_widget.addPlot(row=channel, col=0)
+                    
+                    # Custom time axis
+                    time_axis = TimeAxisItem(start_time=start_time, orientation='bottom')
+                    plot.setAxisItems({'bottom': time_axis})
+                    
+                    # Plot the data
+                    curve = plot.plot(time_points, channel_values[channel], pen=pg.mkPen(color=colors[channel % len(colors)], width=1.5))
+                    plots.append(curve)
+                    
+                    # Configure plot
+                    plot.showGrid(x=True, y=True, alpha=0.7)
+                    plot.setLabel('right', f'Channel {channel + 1}', units='')
+                    plot.getAxis('right').setStyle(tickTextOffset=10)
+                    plot.getAxis('left').setStyle(showValues=False)
+                    plot.setXRange(0, window_size)
+                    
+                    # Y-axis scaling
+                    y_ticks = self.generate_y_ticks(channel_values[channel])
+                    plot.setYRange(min(channel_values[channel]) - 1000, max(channel_values[channel]) + 1000)
+                    plot.getAxis('right').setTicks([[(v, str(int(v))) for v in y_ticks]])
+                    
+                    # Custom tick formatting for X-axis
                     num_ticks = 11
                     tick_positions = np.linspace(0, window_size, num_ticks)
-                    ax.set_xticks(tick_positions)
-                    ax.xaxis.set_major_formatter(FuncFormatter(time_formatter))
-
-                    y_min, y_max = min(channel_values[channel]), max(channel_values[channel])
-                    padding = (y_max - y_min) * 0.1 if y_max != y_min else 1000
-                    ax.set_ylim(y_min - padding, y_max + padding)
-
-                    step = (y_max - y_min) / 10
-                    step = np.ceil(step / 500) * 500
-                    ticks = np.arange(np.floor(y_min / step) * step, y_max + step, step)
-                    ax.set_yticks(ticks)
+                    time_labels = [(start_time + timedelta(seconds=pos)).strftime('%H:%M:%S.%f')[:-3] for pos in tick_positions]
+                    time_axis.setTicks([[(pos, label) for pos, label in zip(tick_positions, time_labels)]])
                 else:
-                    ax.set_visible(False)
-                axes.append(ax)
+                    # Add empty plot to maintain layout
+                    plot = self.plot_widget.addPlot(row=channel, col=0)
+                    plot.hide()
 
-            self.figure.subplots_adjust(left=0.05, right=0.85, top=0.95, bottom=0.15, hspace=0.4)
-            self.canvas.setMinimumSize(1000, 800)
-            self.canvas.draw()
+            # Adjust layout
+            self.plot_widget.setMinimumSize(1000, 300 * num_channels)
             self.parent.append_to_console(f"Successfully plotted data for {filename} with {num_channels} channels in selected time range")
         except Exception as e:
             logging.error(f"Error plotting data for {filename}: {e}")
             self.parent.append_to_console(f"Error plotting data for {filename}: {str(e)}")
-            self.figure.clear()
-            self.canvas.draw()
+            self.plot_widget.clear()
 
     def get_widget(self):
         return self.widget

@@ -47,7 +47,7 @@ class WaterfallFeature:
     def init_widget(self):
         """Initialize the Waterfall feature widget with integrated control bar."""
         self.widget = DraggableWidget()
-        self.widget.setStyleSheet("background-color: #34495e; border: 1px solid #2c3e50;")
+        self.widget.setStyleSheet("background-color: gray; border: 1px solid #2c3e50;")
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
@@ -59,7 +59,7 @@ class WaterfallFeature:
 
         # Placeholder for Waterfall content (e.g., plot)
         waterfall_content = QLabel("Waterfall View Placeholder")
-        waterfall_content.setStyleSheet("background-color: #455a64; color: white; padding: 10px;")
+        waterfall_content.setStyleSheet("background-color: gray; color: white; padding: 10px;")
         waterfall_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         layout.addWidget(waterfall_content)
 
@@ -79,7 +79,7 @@ class WaterfallFeature:
                 padding: 5px 10px;
                 border-radius: 4px;
                 border: none;
-                background-color: #34495e;
+                background-color: gray;
                 transition: background-color 0.2s ease;
             }
             QPushButton:hover {

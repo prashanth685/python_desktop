@@ -12,9 +12,9 @@ class MQTTPublisher(QObject):
         super().__init__()
         self.broker = broker
         self.topics = topics if isinstance(topics, list) else [topics]
-        self.count = 0
+        self.count = 1
 
-        self.frequency = 15
+        self.frequency = 5
         self.amplitude = (46537 - 16390) / 2
         self.offset = (46537 + 16390) / 2
 
