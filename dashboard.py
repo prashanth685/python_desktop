@@ -1,8 +1,9 @@
 import sys
 import gc
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QSplitter,
-                             QToolBar, QAction, QTreeWidget, QTreeWidgetItem, QInputDialog, QMessageBox,
-                             QSizePolicy, QApplication, QTextEdit, QGridLayout, QDialog, QDialogButtonBox,
+from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, 
+                             QSplitter, QToolBar, QAction, QTreeWidget, QTreeWidgetItem,
+                             QInputDialog, QMessageBox, QSizePolicy, QApplication,
+                             QTextEdit, QGridLayout, QDialog, QDialogButtonBox,
                              QScrollArea, QComboBox)
 from PyQt5.QtCore import Qt, QSize, QTimer
 from PyQt5.QtGui import QIcon, QColor
@@ -25,97 +26,108 @@ from features.history_plot import HistoryPlotFeature
 from features.time_report import TimeReportFeature
 from features.report import ReportFeature
 
-class FeatureCard(QWidget):
-    """A card widget to display a feature with minimize, maximize, and cancel buttons."""
+class FeatureWindow(QWidget):
     def __init__(self, feature_instance, feature_name, parent=None, width=300, height=200):
         super().__init__(parent)
         self.feature_instance = feature_instance
         self.feature_name = feature_name
         self.is_minimized = False
-        self.normal_size = QSize(width, height)  # Dynamic size based on grid
-        self.minimized_size = QSize(width // 2, height // 2)  # Half normal size
-        self.maximized_size = QSize(int(width * 1.5), int(height * 1.5))  # 1.5x normal size
-
+        self.is_maximized = False
+        self.normal_size = QSize(width, height)
+        self.minimized_size = QSize(width, 30)
+        self.maximized_size = None
+        self.previous_grid_state = []  # Stores (widget, row, col, rowspan, colspan)
+        self.previous_scroll_position = 0
+        self.previous_grid_layout = None
+        self.content_widget = None
         self.initUI()
 
     def initUI(self):
-        """Initialize the card UI."""
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
         self.setLayout(layout)
 
-        # Header with feature name and control buttons
+        # Title bar
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(5)
+        header_layout.setSpacing(2)
 
         title_label = QLabel(self.feature_name)
-        title_label.setStyleSheet("color: black; font-size: 16px; font-weight: bold;")
+        title_label.setStyleSheet("color: white; font-size: 14px; font-weight: bold; padding: 5px;")
         header_layout.addWidget(title_label)
-
         header_layout.addStretch()
 
-        minimize_button = QPushButton("⏷")
-        minimize_button.setToolTip("Minimize Card")
-        minimize_button.clicked.connect(self.minimize_card)
-        minimize_button.setStyleSheet("""
+        # Buttons
+        self.minimize_button = QPushButton("🗕")
+        self.minimize_button.clicked.connect(self.minimize_window)
+        self.minimize_button.setStyleSheet("""
+            QPushButton { 
+                color: black; 
+                font-size: 14px; 
+                padding: 2px 8px; 
+                border: none;
+                background: #d3d3d3;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background: #e0e0e0; }
+            QPushButton:pressed { background: #c0c0c0; }
+        """)
+
+        self.maximize_button = QPushButton("🗖")
+        self.maximize_button.clicked.connect(self.maximize_window)
+        self.maximize_button.setStyleSheet("""
+            QPushButton { 
+                color: black; 
+                font-size: 14px; 
+                padding: 2px 8px; 
+                border: none;
+                background: #d3d3d3;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background: #e0e0e0; }
+            QPushButton:pressed { background: #c0c0c0; }
+        """)
+
+        self.close_button = QPushButton("🗙")
+        self.close_button.clicked.connect(self.close_window)
+        self.close_button.setStyleSheet("""
             QPushButton { 
                 color: white; 
                 font-size: 14px; 
-                padding: 2px 6px; 
-                border-radius: 3px; 
-                background-color: #34495e; 
+                padding: 2px 8px; 
                 border: none;
+                background: #ff4040;
+                border-radius: 4px;
             }
-            QPushButton:hover { background-color: #4a90e2; }
-            QPushButton:pressed { background-color: #357abd; }
+            QPushButton:hover { background: #ff6666; }
+            QPushButton:pressed { background: #cc3333; }
         """)
-        header_layout.addWidget(minimize_button)
 
-        maximize_button = QPushButton("⏶")
-        maximize_button.setToolTip("Maximize Card")
-        maximize_button.clicked.connect(self.maximize_card)
-        maximize_button.setStyleSheet("""
-            QPushButton { 
-                color: white; 
-                font-size: 14px; 
-                padding: 2px 6px; 
-                border-radius: 3px; 
-                background-color: #34495e; 
-                border: none;
+        header_layout.addWidget(self.minimize_button)
+        header_layout.addWidget(self.maximize_button)
+        header_layout.addWidget(self.close_button)
+
+        header_widget = QWidget()
+        header_widget.setLayout(header_layout)
+        header_widget.setStyleSheet("""
+            QWidget { 
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0055ff, stop:1 #00aaff); 
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
             }
-            QPushButton:hover { background-color: #4a90e2; }
-            QPushButton:pressed { background-color: #357abd; }
         """)
-        header_layout.addWidget(maximize_button)
-
-        cancel_button = QPushButton("✖")
-        cancel_button.setToolTip("Close Card")
-        cancel_button.clicked.connect(self.close_card)
-        cancel_button.setStyleSheet("""
-            QPushButton { 
-                color: white; 
-                font-size: 14px; 
-                padding: 2px 6px; 
-                border-radius: 3px; 
-                background-color: #d32f2f; 
-                border: none;
-            }
-            QPushButton:hover { background-color: #ef5350; }
-            QPushButton:pressed { background-color: #b71c1c; }
-        """)
-        header_layout.addWidget(cancel_button)
-
-        layout.addLayout(header_layout)
+        layout.addWidget(header_widget)
 
         # Feature content
         self.content_widget = self.feature_instance.get_widget()
         if self.content_widget:
+            self.content_widget.show()
             layout.addWidget(self.content_widget)
         else:
-            logging.error(f"No widget available for feature: {self.feature_name}")
-            layout.addWidget(QLabel("Feature not available"))
+            error_label = QLabel("Feature not available")
+            error_label.setStyleSheet("color: #ecf0f1; font-size: 14px;")
+            layout.addWidget(error_label)
 
         self.setStyleSheet("""
             QWidget { 
@@ -126,71 +138,198 @@ class FeatureCard(QWidget):
         """)
         self.setFixedSize(self.normal_size)
 
-    def minimize_card(self):
-        """Minimize the card."""
-        if not self.is_minimized:
+    def minimize_window(self):
+        if not self.is_minimized and not self.is_maximized:
             self.setFixedSize(self.minimized_size)
             self.is_minimized = True
-            self.content_widget.hide()
-            logging.info(f"Minimized card: {self.feature_name}")
+            if self.content_widget:
+                self.content_widget.hide()
+            self.minimize_button.setEnabled(False)
+            logging.info(f"Minimized window: {self.feature_name}")
 
-    def maximize_card(self):
-        """Maximize or restore the card."""
-        if self.is_minimized:
-            self.setFixedSize(self.normal_size)
+            dashboard = self.get_dashboard_parent()
+            if dashboard:
+                dashboard.resize_grid()
+
+    def maximize_window(self):
+        dashboard = self.get_dashboard_parent()
+        if not dashboard:
+            logging.error("Could not find DashboardWindow parent")
+            return
+
+        if not self.is_maximized:
+            # Save current grid state
+            self.previous_grid_state = []
+            self.previous_grid_layout = dashboard.current_grid_layout
+            if dashboard.grid_layout:
+                for i in range(dashboard.grid_layout.count()):
+                    item = dashboard.grid_layout.itemAt(i)
+                    if item and item.widget():
+                        widget = item.widget()
+                        pos = dashboard.grid_layout.getItemPosition(i)
+                        if widget != self:
+                            self.previous_grid_state.append((widget, pos[0], pos[1], pos[2], pos[3]))
+                            widget.hide()
+
+            # Save scroll position
+            if dashboard.scroll_area and dashboard.scroll_area.verticalScrollBar():
+                self.previous_scroll_position = dashboard.scroll_area.verticalScrollBar().value()
+
+            # Maximize
+            content_width = dashboard.content_container.width() - 20
+            content_height = dashboard.content_container.height() - dashboard.console.height() - 20
+            self.maximized_size = QSize(content_width, content_height)
+            self.setMinimumSize(self.maximized_size)
+            self.setMaximumSize(QSize(16777215, 16777215))
+            self.is_maximized = True
             self.is_minimized = False
-            self.content_widget.show()
-            logging.info(f"Restored card: {self.feature_name}")
+            self.minimize_button.setEnabled(True)
+            self.maximize_button.setText("🗗")
+            self.maximize_button.setToolTip("Restore Window")
+
+            # Replace grid with this window inside scroll area
+            dashboard.clear_content_layout()
+            scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setStyleSheet("QScrollArea { background-color: #263238; border: none; }")
+            scroll_area.setWidget(self)
+            dashboard.content_layout.addWidget(scroll_area)
+            dashboard.scroll_area = scroll_area
+            self.show()
+            logging.info(f"Maximized window: {self.feature_name}")
         else:
-            self.setFixedSize(self.maximized_size)
-            self.is_minimized = False
-            self.content_widget.show()
-            logging.info(f"Maximized card: {self.feature_name}")
+            self.restore_grid(dashboard)
 
-    def close_card(self):
-        """Close the card and clean up, triggering grid resize."""
+    def restore_grid(self, dashboard):
+        try:
+            # Reset states
+            self.is_maximized = False
+            self.is_minimized = False
+            self.minimize_button.setEnabled(True)
+            self.maximize_button.setText("🗖")
+            self.maximize_button.setToolTip("Maximize Window")
+
+            # Clear current layout
+            dashboard.clear_content_layout()
+
+            # Restore grid
+            scroll_area = QScrollArea()
+            scroll_area.setWidgetResizable(True)
+            scroll_area.setStyleSheet("QScrollArea { background-color: #263238; border: none; }")
+            scroll_widget = QWidget()
+            dashboard.grid_layout = QGridLayout()
+            dashboard.grid_layout.setContentsMargins(10, 10, 10, 10)
+            dashboard.grid_layout.setSpacing(10)
+            scroll_widget.setLayout(dashboard.grid_layout)
+            scroll_area.setWidget(scroll_widget)
+            dashboard.content_layout.addWidget(scroll_area)
+            dashboard.scroll_area = scroll_area
+
+            # Calculate sizes
+            rows, cols = map(int, self.previous_grid_layout.split('x'))
+            content_width = dashboard.content_container.width() - 30
+            content_height = dashboard.content_container.height() - dashboard.console.height() - 20
+            vertical_gap = dashboard.grid_layout.verticalSpacing()
+            total_gaps_height = vertical_gap * (rows - 1) if rows > 1 else 0
+            window_width = max(200, (content_width - (cols - 1) * 10 - 20) // cols)
+            available_height = content_height - total_gaps_height
+            window_height = max(150, available_height // rows)
+
+            # Restore this window first
+            self.normal_size = QSize(window_width, window_height)
+            self.minimized_size = QSize(window_width, 30)
+            self.setFixedSize(self.normal_size)
+            dashboard.grid_layout.addWidget(self, 0, 0)
+            self.show()
+
+            # Restore other widgets
+            for widget, row, col, rowspan, colspan in self.previous_grid_state:
+                try:
+                    if widget and isinstance(widget, FeatureWindow) and not widget.isHidden():
+                        widget.normal_size = QSize(window_width, window_height)
+                        widget.minimized_size = QSize(window_width, 30)
+                        widget.setFixedSize(widget.normal_size if not widget.is_minimized else widget.minimized_size)
+                        dashboard.grid_layout.addWidget(widget, row, col, rowspan, colspan)
+                        widget.show()
+                    else:
+                        logging.warning(f"Skipping invalid or hidden widget at row {row}, col {col}")
+                except RuntimeError as e:
+                    logging.error(f"Error restoring widget at row {row}, col {col}: {str(e)}")
+                    continue
+
+            # Fill empty cells
+            for row in range(rows):
+                for col in range(cols):
+                    if not dashboard.grid_layout.itemAtPosition(row, col):
+                        empty_widget = QWidget()
+                        empty_widget.setStyleSheet("background-color: transparent;")
+                        empty_widget.setFixedSize(window_width, window_height)
+                        dashboard.grid_layout.addWidget(empty_widget, row, col)
+                        empty_widget.show()
+
+            # Set scroll widget size
+            total_windows_height = (window_height * rows) + total_gaps_height
+            scroll_widget.setMinimumSize(content_width, total_windows_height + 20)
+
+            # Restore scroll position
+            if dashboard.scroll_area and dashboard.scroll_area.verticalScrollBar():
+                dashboard.scroll_area.verticalScrollBar().setValue(self.previous_scroll_position)
+
+            # Update dashboard state
+            dashboard.current_grid_layout = self.previous_grid_layout
+            if dashboard.grid_label:
+                dashboard.grid_label.setText(self.previous_grid_layout)
+
+            dashboard.content_container.update()
+            logging.info(f"Restored grid for window: {self.feature_name} with layout {self.previous_grid_layout}")
+        except Exception as e:
+            logging.error(f"Error restoring grid for {self.feature_name}: {str(e)}")
+            QMessageBox.warning(dashboard, "Error", f"Error restoring grid: {str(e)}")
+
+    def close_window(self):
         try:
             if self.feature_instance:
                 if hasattr(self.feature_instance, 'cleanup'):
                     self.feature_instance.cleanup()
-                self.content_widget.hide()
-                self.content_widget.setParent(None)
-                self.content_widget.deleteLater()
-            self.hide()
+                if self.content_widget:
+                    self.content_widget.setParent(None)
+                    self.content_widget.deleteLater()
+
             self.setParent(None)
             self.deleteLater()
-            logging.info(f"Closed card: {self.feature_name}")
-            # Remove feature instance and resize grid
-            dashboard = self.parent()
-            while dashboard and not isinstance(dashboard, DashboardWindow):
-                dashboard = dashboard.parent()
+
+            dashboard = self.get_dashboard_parent()
             if dashboard:
                 if self.feature_name in dashboard.feature_instances:
                     del dashboard.feature_instances[self.feature_name]
-                if dashboard.current_grid_layout and dashboard.current_grid_layout != "1x1" and dashboard.card_layout:
-                    dashboard.resize_grid()
+                feature_names = [name for name, instance in dashboard.feature_instances.items() if instance]
+                dashboard.display_features(feature_names, dashboard.current_grid_layout)
         except Exception as e:
-            logging.error(f"Error closing card {self.feature_name}: {str(e)}")
+            logging.error(f"Error closing window {self.feature_name}: {str(e)}")
+
+    def get_dashboard_parent(self):
+        dashboard = self.parent()
+        while dashboard and not isinstance(dashboard, DashboardWindow):
+            dashboard = dashboard.parent()
+        return dashboard
 
 class CustomizeFeaturesDialog(QDialog):
-    """Dialog to select grid layout only."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Customize Grid Layout")
-        self.grid_layout = "1x1"
+        self.grid_layout = "1x2"
         self.initUI()
 
     def initUI(self):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # Grid layout selection
         layout_label = QLabel("Select Grid Layout (Rows x Columns):")
         layout_label.setStyleSheet("color: #ecf0f1; font-size: 16px; padding-bottom: 5px;")
         layout.addWidget(layout_label)
 
         self.grid_combo = QComboBox()
-        grid_options = ["1x1", "1x2", "2x1", "2x2", "2x3", "3x2", "3x3"]
+        grid_options = ["1x1", "1x2", "1x3", "2x2", "2x3", "3x3"]
         self.grid_combo.addItems(grid_options)
         self.grid_combo.setStyleSheet("""
             QComboBox {
@@ -242,6 +381,7 @@ class CustomizeFeaturesDialog(QDialog):
                 background-color: #2c5d9b; 
             }
         """)
+
         self.setFixedSize(300, 200)
 
     def accept(self):
@@ -257,38 +397,35 @@ class DashboardWindow(QWidget):
         self.project_selection_window = project_selection_window
         self.current_feature = None
         self.mqtt_handler = None
-        self.feature_instances = {}  # Cache feature instances
+        self.feature_instances = {}
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.is_saving = False
         self.mqtt_connected = False
-        self.fft_window = None  # Kept for compatibility
-        self.card_layout = None  # For card-based feature display
-        self.current_grid_layout = None  # Store current grid layout (e.g., "2x3")
-        self.grid_label = ""  # Label for displaying grid layout
-
-        # Initialize UI first
+        self.fft_window = None
+        self.grid_layout = None
+        self.current_grid_layout = "1x1"
+        self.grid_label = None
+        self.scroll_area = None
         self.initUI()
-
-        # Defer other initialization tasks
         QTimer.singleShot(0, self.deferred_initialization)
 
     def deferred_initialization(self):
-        """Perform initialization tasks after the window is shown."""
         try:
             self.load_project_features()
             self.setup_mqtt()
-            self.display_feature_content("Create Tags", self.current_project)
+            self.display_features(["Create Tags"], self.current_grid_layout)
         except Exception as e:
             logging.error(f"Error in deferred initialization: {str(e)}")
             QMessageBox.warning(self, "Error", f"Initialization error: {str(e)}")
 
     def setup_mqtt(self):
-        """Set up MQTT handler for the current project if tags exist."""
         if not self.current_project:
             logging.warning("No project selected for MQTT setup")
             return
+
         self.cleanup_mqtt()
+
         try:
             tags = self.get_project_tags()
             if tags:
@@ -306,10 +443,10 @@ class DashboardWindow(QWidget):
             logging.error(f"Failed to setup MQTT: {str(e)}")
             QMessageBox.warning(self, "Error", f"Failed to setup MQTT: {str(e)}")
             self.append_to_console(f"Failed to setup MQTT: {str(e)}")
+
         self.update_subtoolbar()
 
     def cleanup_mqtt(self):
-        """Clean up existing MQTT handler."""
         if self.mqtt_handler:
             try:
                 self.mqtt_handler.data_received.disconnect()
@@ -324,7 +461,6 @@ class DashboardWindow(QWidget):
                 self.mqtt_connected = False
 
     def get_project_tags(self):
-        """Retrieve tags for the current project from the database."""
         try:
             if not self.db.is_connected():
                 self.db.reconnect()
@@ -335,16 +471,17 @@ class DashboardWindow(QWidget):
             return []
 
     def connect_mqtt(self):
-        """Connect to MQTT based on project tags."""
         if self.mqtt_connected:
             self.append_to_console("Already connected to MQTT")
             return
+
         try:
             tags = self.get_project_tags()
             if not tags:
                 QMessageBox.warning(self, "Error", "No tags found for this project. Please create tags first!")
                 self.append_to_console("No tags found for project")
                 return
+
             self.cleanup_mqtt()
             self.mqtt_handler = MQTTHandler(self.db, self.current_project)
             self.mqtt_handler.data_received.connect(self.on_data_received)
@@ -352,6 +489,7 @@ class DashboardWindow(QWidget):
             self.mqtt_handler.start()
             self.mqtt_connected = True
             self.update_subtoolbar()
+
             logging.info(f"MQTT connected for project: {self.current_project}")
             self.append_to_console(f"MQTT connected for project: {self.current_project}")
         except Exception as e:
@@ -362,10 +500,10 @@ class DashboardWindow(QWidget):
             self.update_subtoolbar()
 
     def disconnect_mqtt(self):
-        """Disconnect from MQTT."""
         if not self.mqtt_connected:
             self.append_to_console("Already disconnected from MQTT")
             return
+
         try:
             self.cleanup_mqtt()
             self.update_subtoolbar()
@@ -378,7 +516,6 @@ class DashboardWindow(QWidget):
             self.update_subtoolbar()
 
     def on_data_received(self, tag_name, values):
-        """Handle incoming MQTT data."""
         if self.current_feature and self.current_project:
             feature_instance = self.feature_instances.get(self.current_feature)
             if feature_instance and hasattr(feature_instance, 'on_data_received'):
@@ -386,33 +523,29 @@ class DashboardWindow(QWidget):
                     feature_instance.on_data_received(tag_name, values)
                 except Exception as e:
                     logging.error(f"Error in on_data_received for {self.current_feature}: {str(e)}")
-        # Update all card-based features
+
         for feature_name, instance in self.feature_instances.items():
             if hasattr(instance, 'on_data_received'):
                 try:
                     instance.on_data_received(tag_name, values)
                 except Exception as e:
-                    logging.error(f"Error in on_data_received for card feature {feature_name}: {str(e)}")
+                    logging.error(f"Error in on_data_received for feature {feature_name}: {str(e)}")
 
     def on_mqtt_status(self, message):
-        """Handle MQTT connection status updates."""
         self.mqtt_connected = "Connected" in message
         self.append_to_console(f"MQTT Status: {message}")
         self.update_subtoolbar()
 
     def append_to_console(self, text):
-        """Append MQTT-related text to the console widget."""
         if "MQTT" in text or "mqtt" in text:
             if hasattr(self, 'console'):
                 self.console.append(text)
                 self.console.ensureCursorVisible()
 
     def initUI(self):
-        """Initialize the user interface with a console fixed at the bottom."""
         self.setWindowTitle(f'Sarayu Desktop Application - {self.current_project.upper()}')
         self.setWindowState(Qt.WindowMaximized)
 
-        # Apply global stylesheet
         app = QApplication.instance()
         app.setStyleSheet("""
             QInputDialog, QMessageBox, QDialog {
@@ -455,6 +588,26 @@ class DashboardWindow(QWidget):
             QMessageBox QPushButton:pressed {
                 background-color: #2c5d9b;
             }
+            QScrollBar:vertical {
+                border: none;
+                background: #263238;
+                width: 10px;
+                margin: 0px 0px 0px 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #4a90e2;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #357abd;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
         """)
 
         main_layout = QVBoxLayout()
@@ -462,6 +615,7 @@ class DashboardWindow(QWidget):
         main_layout.setSpacing(0)
         self.setLayout(main_layout)
 
+        # File toolbar
         self.file_bar = QToolBar("File")
         self.file_bar.setStyleSheet("""
             QToolBar {
@@ -491,29 +645,33 @@ class DashboardWindow(QWidget):
             ("Home", "Go to Dashboard Home", self.display_dashboard),
             ("Open", "Open an Existing Project", self.open_project),
             ("New", "Create a New Project", self.create_project),
-            ("Save", "Save Current Project Data", self.save_action),
             ("Settings", "Open Application Settings", self.settings_action),
             ("Refresh", "Refresh Current View", self.refresh_action),
             ("Exit", "Exit Application", self.close)
         ]
+
         for text, tooltip, func in actions:
             action = QAction(text, self)
             action.setToolTip(tooltip)
             action.triggered.connect(func)
             self.file_bar.addAction(action)
+
         main_layout.addWidget(self.file_bar)
 
+        # Feature toolbar
         self.toolbar = QToolBar("Features")
         self.toolbar.setFixedHeight(75)
         self.update_toolbar()
         main_layout.addWidget(self.toolbar)
 
+        # Main splitter
         main_splitter = QSplitter(Qt.Horizontal)
         main_splitter.setContentsMargins(0, 0, 0, 0)
         main_splitter.setHandleWidth(1)
         main_splitter.setStyleSheet("QSplitter::handle { background-color: #2c3e50; }")
         main_layout.addWidget(main_splitter)
 
+        # Left panel - Tree widget
         self.tree = QTreeWidget()
         self.tree.header().hide()
         self.tree.setStyleSheet("""
@@ -539,6 +697,7 @@ class DashboardWindow(QWidget):
         self.tree.itemClicked.connect(self.on_tree_item_clicked)
         main_splitter.addWidget(self.tree)
 
+        # Right container
         right_container = QWidget()
         right_container.setStyleSheet("background-color: #263238;")
         right_layout = QVBoxLayout()
@@ -546,6 +705,7 @@ class DashboardWindow(QWidget):
         right_layout.setSpacing(0)
         right_container.setLayout(right_layout)
 
+        # Subtoolbar container
         subtoolbar_container = QWidget()
         subtoolbar_container.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #eceff1, stop:1 #cfd8dc);")
         subtoolbar_layout = QHBoxLayout()
@@ -555,13 +715,11 @@ class DashboardWindow(QWidget):
 
         self.subtoolbar = QToolBar("Controls")
         self.subtoolbar.setFixedHeight(100)
-        self.current_feature_label = QLabel("")
-        self.current_feature_label.setStyleSheet("color: #333; font-size: 16px; font-weight: bold;")
-        subtoolbar_layout.addWidget(self.current_feature_label)
         subtoolbar_layout.addWidget(self.subtoolbar)
         self.update_subtoolbar()
         right_layout.addWidget(subtoolbar_container)
 
+        # Content area
         self.content_container = QWidget()
         self.content_container.setStyleSheet("background-color: #263238;")
         self.content_layout = QVBoxLayout()
@@ -570,6 +728,7 @@ class DashboardWindow(QWidget):
         self.content_container.setLayout(self.content_layout)
         right_layout.addWidget(self.content_container, 1)
 
+        # Console
         console_container = QWidget()
         console_layout = QVBoxLayout()
         console_layout.setContentsMargins(0, 0, 0, 0)
@@ -579,7 +738,6 @@ class DashboardWindow(QWidget):
         button_layout = QHBoxLayout()
         button_layout.setContentsMargins(0, 0, 0, 0)
         button_layout.setSpacing(5)
-
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         button_layout.addWidget(spacer)
@@ -657,7 +815,6 @@ class DashboardWindow(QWidget):
         main_splitter.setSizes([250, 950])
 
     def clear_console(self):
-        """Clear the console output."""
         try:
             self.console.clear()
             logging.info("Console cleared")
@@ -665,23 +822,22 @@ class DashboardWindow(QWidget):
             logging.error(f"Error clearing console: {str(e)}")
 
     def minimize_console(self):
-        """Set console height to 50px."""
         try:
             self.console.setFixedHeight(50)
             logging.info("Console minimized to 50px")
+            self.resize_grid()
         except Exception as e:
             logging.error(f"Error minimizing console: {str(e)}")
 
     def maximize_console(self):
-        """Set console height to 150px."""
         try:
             self.console.setFixedHeight(150)
             logging.info("Console maximized to 150px")
+            self.resize_grid()
         except Exception as e:
             logging.error(f"Error maximizing console: {str(e)}")
 
     def update_file_bar(self):
-        """Update the file bar stylesheet."""
         try:
             self.file_bar.setStyleSheet("""
                 QToolBar {
@@ -707,7 +863,6 @@ class DashboardWindow(QWidget):
             logging.error(f"Error updating file bar: {str(e)}")
 
     def update_toolbar(self):
-        """Update the feature toolbar with text-based emoji icons."""
         self.toolbar.clear()
         self.toolbar.setStyleSheet("""
             QToolBar { 
@@ -741,7 +896,7 @@ class DashboardWindow(QWidget):
 
         def add_action(feature_name, text_icon, color, tooltip):
             action = QAction(text_icon, self)
-            action.triggered.connect(lambda: self.display_feature_content(feature_name, self.current_project))
+            action.triggered.connect(lambda: self.add_feature_to_grid(feature_name))
             action.setToolTip(tooltip)
             self.toolbar.addAction(action)
             button = self.toolbar.widgetForAction(action)
@@ -759,18 +914,18 @@ class DashboardWindow(QWidget):
                 """)
 
         feature_actions = [
-            ("Create Tags", "🏷️", "#81c784", "Access Create Tags Feature"),
-            ("Time View", "⏱️", "#ffb300", "Access Time View Feature"),
-            ("Tabular View", "📋", "#64b5f6", "Access Tabular View Feature"),
-            ("Time Report", "📄", "#4db6ac", "Access Time Report Feature"),
-            ("FFT", "📈", "#ba68c8", "Access FFT View Feature"),
-            ("Waterfall", "🌊", "#4dd0e1", "Access Waterfall Feature"),
-            ("Orbit", "🪐", "#f06292", "Access Orbit Feature"),
-            ("Trend View", "📉", "#aed581", "Access Trend View Feature"),
-            ("Multiple Trend View", "📊", "#ff8a65", "Access Multiple Trend View Feature"),
-            ("Bode Plot", "🔍", "#7986cb", "Access Bode Plot Feature"),
-            ("History Plot", "🕰️", "#ef5350", "Access History Plot Feature"),
-            ("Report", "📝", "#ab47bc", "Access Report Feature"),
+            ("Create Tags", "🏷️", "#81c784", "Add Create Tags Feature"),
+            ("Time View", "⏱️", "#ffb300", "Add Time View Feature"),
+            ("Tabular View", "📋", "#64b5f6", "Add Tabular View Feature"),
+            ("Time Report", "📄", "#4db6ac", "Add Time Report Feature"),
+            ("FFT", "📈", "#ba68c8", "Add FFT View Feature"),
+            ("Waterfall", "🌊", "#4dd0e1", "Add Waterfall Feature"),
+            ("Orbit", "🪐", "#f06292", "Add Orbit Feature"),
+            ("Trend View", "📉", "#aed581", "Add Trend View Feature"),
+            ("Multiple Trend View", "📊", "#ff8a65", "Add Multiple Trend View Feature"),
+            ("Bode Plot", "🔍", "#7986cb", "Add Bode Plot Feature"),
+            ("History Plot", "🕰️", "#ef5350", "Add History Plot Feature"),
+            ("Report", "📝", "#ab47bc", "Add Report Feature"),
         ]
 
         for feature_name, text_icon, color, tooltip in feature_actions:
@@ -781,7 +936,6 @@ class DashboardWindow(QWidget):
         self.toolbar.addWidget(spacer)
 
     def update_subtoolbar(self):
-        """Update the subtoolbar with controls and grid layout label."""
         self.subtoolbar.clear()
         self.subtoolbar.setStyleSheet("""
             QToolBar { 
@@ -835,7 +989,7 @@ class DashboardWindow(QWidget):
                     QToolButton:disabled {{ background-color: #546e7a; color: #b0bec5; }}
                 """)
 
-        is_time_view = self.current_feature == "Time View"
+        is_time_view = "Time View" in self.feature_instances
         add_action("▶", "#ffffff", self.start_saving, "Start Saving Data (Time View)", is_time_view and not self.is_saving, "#43a047")
         add_action("⏸", "#ffffff", self.stop_saving, "Stop Saving Data (Time View)", is_time_view and self.is_saving, "#ef5350")
         self.subtoolbar.addSeparator()
@@ -846,11 +1000,11 @@ class DashboardWindow(QWidget):
         add_action("🔴", "#ffffff", self.disconnect_mqtt, "Disconnect from MQTT", self.mqtt_connected, disconnect_bg)
         self.subtoolbar.addSeparator()
 
-        # Add customize action with grid label
         customize_action = QAction("🎛️", self)
         customize_action.triggered.connect(self.customize_features)
         customize_action.setToolTip("Customize Grid Layout")
         self.subtoolbar.addAction(customize_action)
+
         customize_button = self.subtoolbar.widgetForAction(customize_action)
         if customize_button:
             customize_button.setStyleSheet("""
@@ -866,8 +1020,9 @@ class DashboardWindow(QWidget):
                 QToolButton:pressed { background-color: #357abd; }
             """)
 
-        # Grid layout label
-        self.grid_label = QLabel(self.current_grid_layout or "")
+        if not self.grid_label:
+            self.grid_label = QLabel(self.current_grid_layout)
+        self.grid_label.setText(self.current_grid_layout)
         self.grid_label.setStyleSheet("color: #333; font-size: 14px; margin-left: 5px;")
         self.subtoolbar.addWidget(self.grid_label)
 
@@ -876,29 +1031,48 @@ class DashboardWindow(QWidget):
         self.subtoolbar.addWidget(spacer)
 
     def customize_features(self):
-        """Open a dialog to select grid layout."""
         try:
             dialog = CustomizeFeaturesDialog(self)
             if dialog.exec_():
                 grid_layout = dialog.grid_layout
                 self.current_grid_layout = grid_layout
                 self.grid_label.setText(grid_layout)
-                if grid_layout == "1x1":
-                    self.display_feature_content("Create Tags", self.current_project)
-                else:
-                    self.display_feature_cards([], grid_layout)
+                existing_features = list(self.feature_instances.keys())
+                self.display_features(existing_features, grid_layout)
             else:
                 logging.info("Customize grid dialog cancelled")
         except Exception as e:
             logging.error(f"Error customizing grid: {str(e)}")
             QMessageBox.warning(self, "Error", f"Error customizing grid: {str(e)}")
 
-    def display_feature_cards(self, feature_names, grid_layout):
-        """Display an empty or partially filled grid for feature cards."""
+    def determine_grid_layout(self, num_features):
+        if num_features <= 1:
+            return "1x1"
+        elif num_features == 2:
+            return "1x2"
+        elif num_features <= 4:
+            return "2x2"
+        elif num_features <= 6:
+            return "2x3"
+        else:
+            return "3x3"
+
+    def calculate_grid_sizes(self, grid_layout, console_height):
+        rows, cols = map(int, grid_layout.split('x'))
+        content_width = self.content_container.width() - 30
+        content_height = self.content_container.height() - console_height - 20
+        vertical_gap = 10  # Matches grid_layout.setSpacing(10)
+        total_gaps_height = vertical_gap * (rows - 1) if rows > 1 else 0
+        window_width = max(200, (content_width - (cols - 1) * 10 - 20) // cols)
+        available_height = content_height - total_gaps_height
+        window_height = max(150, available_height // rows)
+        total_windows_height = (window_height * rows) + total_gaps_height
+        return rows, cols, content_width, window_width, window_height, total_windows_height
+
+    def display_features(self, feature_names, grid_layout):
         try:
             current_console_height = self.console.height()
             self.clear_content_layout()
-            self.current_feature = None
             self.is_saving = False
             self.update_subtoolbar()
 
@@ -906,22 +1080,19 @@ class DashboardWindow(QWidget):
             scroll_area.setWidgetResizable(True)
             scroll_area.setStyleSheet("QScrollArea { background-color: #263238; border: none; }")
             scroll_widget = QWidget()
-            self.card_layout = QGridLayout()
-            self.card_layout.setContentsMargins(10, 10, 10, 10)
-            self.card_layout.setSpacing(10)
-            scroll_widget.setLayout(self.card_layout)
+            self.grid_layout = QGridLayout()
+            self.grid_layout.setContentsMargins(10, 10, 10, 10)
+            self.grid_layout.setSpacing(10)
+            scroll_widget.setLayout(self.grid_layout)
             scroll_area.setWidget(scroll_widget)
             self.content_layout.addWidget(scroll_area)
+            self.scroll_area = scroll_area
 
-            rows, cols = map(int, grid_layout.split('x'))
-            max_cards = rows * cols
+            rows, cols, content_width, window_width, window_height, total_windows_height = self.calculate_grid_sizes(grid_layout, current_console_height)
+            self.current_grid_layout = grid_layout
+            self.grid_label.setText(grid_layout)
 
-            # Calculate card size with fallback
-            content_width = self.content_container.width() if self.content_container.width() > 100 else 950
-            content_height = self.content_container.height() if self.content_container.height() > 100 else 600
-            content_height -= current_console_height + 20
-            card_width = max(200, (content_width - (cols - 1) * 10 - 20) // cols)
-            card_height = max(150, (content_height - (rows - 1) * 10) // rows)
+            scroll_widget.setMinimumSize(content_width, total_windows_height + 20)
 
             feature_classes = {
                 "Create Tags": CreateTagsFeature,
@@ -938,89 +1109,119 @@ class DashboardWindow(QWidget):
                 "Report": ReportFeature
             }
 
+            # Clean up feature instances not in the new list
+            features_to_remove = [name for name in self.feature_instances.keys() if name not in feature_names]
+            for feature_name in features_to_remove:
+                instance = self.feature_instances.pop(feature_name, None)
+                if instance:
+                    if hasattr(instance, 'cleanup'):
+                        instance.cleanup()
+                    widget = instance.get_widget()
+                    if widget:
+                        widget.hide()
+                        widget.setParent(None)
+                        widget.deleteLater()
+
             row = 0
             col = 0
-            for feature_name in feature_names[:max_cards]:
+
+            for feature_name in feature_names:
                 if feature_name in feature_classes:
                     try:
                         feature_instance = self.feature_instances.get(feature_name)
+                        if feature_instance:
+                            try:
+                                widget = feature_instance.get_widget()
+                                if not widget or widget.isHidden():
+                                    logging.warning(f"Feature instance {feature_name} exists but widget is invalid or hidden")
+                                    del self.feature_instances[feature_name]
+                                    feature_instance = None
+                            except RuntimeError:
+                                logging.warning(f"Feature instance {feature_name} is invalid, recreating")
+                                del self.feature_instances[feature_name]
+                                feature_instance = None
+
                         if not feature_instance or getattr(feature_instance, 'project_name', None) != self.current_project:
                             if not self.db.is_connected():
                                 self.db.reconnect()
+                            logging.info(f"Creating new instance for feature: {feature_name}")
                             feature_instance = feature_classes[feature_name](self, self.db, self.current_project)
                             self.feature_instances[feature_name] = feature_instance
 
-                        card = FeatureCard(feature_instance, feature_name, self, card_width, card_height)
-                        self.card_layout.addWidget(card, row, col)
+                        window = FeatureWindow(feature_instance, feature_name, self, window_width, window_height)
+                        self.grid_layout.addWidget(window, row, col)
+                        window.show()
 
                         col += 1
                         if col >= cols:
                             col = 0
                             row += 1
                     except Exception as e:
-                        logging.error(f"Failed to create card for {feature_name}: {str(e)}")
-                        QMessageBox.warning(self, "Error", f"Failed to create card for {feature_name}: {str(e)}")
+                        logging.error(f"Failed to create window for {feature_name}: {str(e)}")
+                        QMessageBox.warning(self, "Error", f"Failed to create window for {feature_name}: {str(e)}")
                 else:
                     logging.warning(f"Unknown feature: {feature_name}")
 
-            # Fill remaining grid with empty widgets
+            # Fill empty cells
             while row < rows:
                 while col < cols:
                     empty_widget = QWidget()
                     empty_widget.setStyleSheet("background-color: transparent;")
-                    empty_widget.setFixedSize(card_width, card_height)
-                    self.card_layout.addWidget(empty_widget, row, col)
+                    empty_widget.setFixedSize(window_width, window_height)
+                    self.grid_layout.addWidget(empty_widget, row, col)
+                    empty_widget.show()
                     col += 1
                 col = 0
                 row += 1
 
             self.console.setFixedHeight(current_console_height)
+            self.content_container.update()
+            self.resize_grid()
+
             logging.info(f"Initialized {grid_layout} grid with {len(feature_names)} features")
         except Exception as e:
-            logging.error(f"Error displaying feature cards: {str(e)}")
-            QMessageBox.warning(self, "Error", f"Error displaying feature cards: {str(e)}")
+            logging.error(f"Error displaying features: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Error displaying features: {str(e)}")
 
     def resize_grid(self):
-        """Resize all cards in the grid to fit the current window size."""
         try:
-            if not self.current_grid_layout or not self.card_layout or self.current_grid_layout == "1x1":
+            if not self.current_grid_layout or not self.grid_layout:
                 return
 
-            rows, cols = map(int, self.current_grid_layout.split('x'))
-            current_console_height = self.console.height()
+            rows, cols, content_width, window_width, window_height, total_windows_height = self.calculate_grid_sizes(self.current_grid_layout, self.console.height())
 
-            # Calculate card size with fallback
-            content_width = self.content_container.width() if self.content_container.width() > 100 else 950
-            content_height = self.content_container.height() if self.content_container.height() > 100 else 600
-            content_height -= current_console_height + 20
-            card_width = max(200, (content_width - (cols - 1) * 10 - 20) // cols)
-            card_height = max(150, (content_height - (rows - 1) * 10) // rows)
-
-            # Update all widgets in the grid
             for row in range(rows):
                 for col in range(cols):
-                    item = self.card_layout.itemAtPosition(row, col)
+                    item = self.grid_layout.itemAtPosition(row, col)
                     if item and item.widget():
                         widget = item.widget()
-                        if isinstance(widget, FeatureCard):
-                            widget.normal_size = QSize(card_width, card_height)
-                            widget.minimized_size = QSize(card_width // 2, card_height // 2)
-                            widget.maximized_size = QSize(int(card_width * 1.5), int(card_height * 1.5))
-                            widget.setFixedSize(widget.normal_size if not widget.is_minimized else widget.minimized_size)
-                        else:
-                            widget.setFixedSize(card_width, card_height)
+                        if isinstance(widget, FeatureWindow):
+                            widget.normal_size = QSize(window_width, window_height)
+                            widget.minimized_size = QSize(window_width, 30)
+                            widget.maximized_size = QSize(content_width - 20, self.content_container.height() - self.console.height() - 20)
 
-            logging.info(f"Resized {self.current_grid_layout} grid cards to {card_width}x{card_height}")
+                            if not widget.is_maximized:
+                                widget.setFixedSize(widget.normal_size if not widget.is_minimized else widget.minimized_size)
+                            widget.show()
+                        else:
+                            widget.setFixedSize(window_width, window_height)
+                            widget.show()
+
+            if self.scroll_area and self.scroll_area.widget():
+                self.scroll_area.widget().setMinimumSize(content_width, total_windows_height + 20)
+
+            self.content_container.update()
+            logging.info(f"Resized {self.current_grid_layout} grid windows to {window_width}x{window_height}")
         except Exception as e:
             logging.error(f"Error resizing grid: {str(e)}")
 
     def load_project_features(self):
-        """Load features for the current project into the tree."""
         try:
             if not self.db.is_connected():
                 self.db.reconnect()
             self.tree.clear()
             self.add_project_to_tree(self.current_project)
+
             for i in range(self.tree.topLevelItemCount()):
                 item = self.tree.topLevelItem(i)
                 if item.text(0) == f"📁 {self.current_project}":
@@ -1033,24 +1234,23 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Failed to load project features: {str(e)}")
 
     def add_project_to_tree(self, project_name):
-        """Add the current project and its features to the tree widget."""
         project_item = QTreeWidgetItem(self.tree)
         project_item.setText(0, f"📁 {project_name}")
         project_item.setData(0, Qt.UserRole, {"type": "project", "name": project_name})
 
         features = [
-            ("Create Tags", "🏷️ Create Tags", "Access Create Tags Feature"),
-            ("Time View", "⏱️ Time View", "Access Time View Feature"),
-            ("Tabular View", "📋 Tabular View", "Access Tabular View Feature"),
-            ("FFT", "📈 FFT", "Access FFT View Feature"),
-            ("Waterfall", "🌊 Waterfall", "Access Waterfall Feature"),
-            ("Orbit", "🪐 Orbit", "Access Orbit Feature"),
-            ("Trend View", "📉 Trend View", "Access Trend View Feature"),
-            ("Multiple Trend View", "📊 Multiple Trend View", "Access Multiple Trend View Feature"),
-            ("Bode Plot", "🔍 Bode Plot", "Access Bode Plot Feature"),
-            ("History Plot", "🕰️ History Plot", "Access History Plot Feature"),
-            ("Time Report", "📄 Time Report", "Access Time Report Feature"),
-            ("Report", "📝 Report", "Access Report Feature")
+            ("Create Tags", "🏷️ Create Tags", "Add Create Tags Feature"),
+            ("Time View", "⏱️ Time View", "Add Time View Feature"),
+            ("Tabular View", "📋 Tabular View", "Add Tabular View Feature"),
+            ("FFT", "📈 FFT", "Add FFT View Feature"),
+            ("Waterfall", "🌊 Waterfall", "Add Waterfall Feature"),
+            ("Orbit", "🪐 Orbit", "Add Orbit Feature"),
+            ("Trend View", "📉 Trend View", "Add Trend View Feature"),
+            ("Multiple Trend View", "📊 Multiple Trend View", "Add Multiple Trend View Feature"),
+            ("Bode Plot", "🔍 Bode Plot", "Add Bode Plot Feature"),
+            ("History Plot", "🕰️ History Plot", "Add History Plot Feature"),
+            ("Time Report", "📄 Time Report", "Add Time Report Feature"),
+            ("Report", "📝 Report", "Add Report Feature")
         ]
 
         for feature, text_icon, tooltip in features:
@@ -1060,51 +1260,35 @@ class DashboardWindow(QWidget):
             feature_item.setData(0, Qt.UserRole, {"type": "feature", "name": feature, "project": project_name})
 
     def on_tree_item_clicked(self, item, column):
-        """Handle tree item clicks."""
         data = item.data(0, Qt.UserRole)
         try:
+            logging.info(f"Tree item clicked: {data}")
+
             if data["type"] == "project":
                 self.current_feature = None
                 self.is_saving = False
-                self.current_grid_layout = None
-                self.card_layout = None
-                self.grid_label.setText("None")
-                self.display_feature_content("Create Tags", self.current_project)
+                self.feature_instances.clear()
+                self.display_features(["Create Tags"], "1x1")
             elif data["type"] == "feature":
                 feature_name = data["name"]
-                if self.current_grid_layout and self.card_layout and self.current_grid_layout != "1x1":
-                    existing_features = []
-                    for i in range(self.card_layout.count()):
-                        widget = self.card_layout.itemAt(i).widget()
-                        if isinstance(widget, FeatureCard):
-                            existing_features.append(widget.feature_name)
-                    if feature_name in existing_features:
-                        QMessageBox.information(self, "Info", f"Feature '{feature_name}' is already displayed in the grid.")
-                        return
-
-                    rows, cols = map(int, self.current_grid_layout.split('x'))
-                    if len(existing_features) < rows * cols:
-                        self.add_feature_to_grid(feature_name)
-                    else:
-                        QMessageBox.warning(self, "Error", "Grid is full! Choose a larger grid or remove a feature.")
-                else:
-                    self.current_feature = feature_name
-                    self.is_saving = False
-                    self.current_grid_layout = None
-                    self.card_layout = None
-                    self.grid_label.setText("None")
-                    self.display_feature_content(feature_name, self.current_project)
+                if feature_name in self.feature_instances:
+                    for i in range(self.grid_layout.count()):
+                        grid_item = self.grid_layout.itemAt(i)
+                        if grid_item and grid_item.widget():
+                            widget = grid_item.widget()
+                            if isinstance(widget, FeatureWindow) and widget.feature_name == feature_name:
+                                widget.raise_()
+                                widget.activateWindow()
+                                logging.info(f"Feature {feature_name} already in grid, brought to focus")
+                                return
+                self.add_feature_to_grid(feature_name)
         except Exception as e:
             logging.error(f"Error handling tree item click: {str(e)}")
             QMessageBox.warning(self, "Error", f"Error handling tree item click: {str(e)}")
 
     def add_feature_to_grid(self, feature_name):
-        """Add a single feature to the existing card layout."""
         try:
-            if not self.current_grid_layout or not self.card_layout or self.current_grid_layout == "1x1":
-                logging.warning("No active grid layout to add feature")
-                self.display_feature_content(feature_name, self.current_project)
-                return
+            logging.info(f"Adding feature to grid: {feature_name}")
 
             feature_classes = {
                 "Create Tags": CreateTagsFeature,
@@ -1126,50 +1310,49 @@ class DashboardWindow(QWidget):
                 QMessageBox.warning(self, "Error", f"Unknown feature: {feature_name}")
                 return
 
-            rows, cols = map(int, self.current_grid_layout.split('x'))
-            # Calculate card size with fallback
-            content_width = self.content_container.width() if self.content_container.width() > 100 else 950
-            content_height = self.content_container.height() if self.content_container.height() > 100 else 600
-            content_height -= self.console.height() + 20
-            card_width = max(200, (content_width - (cols - 1) * 10 - 20) // cols)
-            card_height = max(150, (content_height - (rows - 1) * 10) // rows)
+            if feature_name in self.feature_instances:
+                QMessageBox.information(self, "Info", f"Feature '{feature_name}' is already displayed in the grid.")
+                for i in range(self.grid_layout.count()):
+                    item = self.grid_layout.itemAt(i)
+                    if item and item.widget():
+                        widget = item.widget()
+                        if isinstance(widget, FeatureWindow) and widget.feature_name == feature_name:
+                            widget.raise_()
+                            widget.activateWindow()
+                            logging.info(f"Feature {feature_name} already in grid, brought to focus")
+                            return
+                return
 
-            for row in range(rows):
-                for col in range(cols):
-                    item = self.card_layout.itemAtPosition(row, col)
-                    if item and isinstance(item.widget(), QWidget) and item.widget().styleSheet() == "background-color: transparent;":
-                        feature_instance = self.feature_instances.get(feature_name)
-                        if not feature_instance or getattr(feature_instance, 'project_name', None) != self.current_project:
-                            if not self.db.is_connected():
-                                self.db.reconnect()
-                            feature_instance = feature_classes[feature_name](self, self.db, self.current_project)
-                            self.feature_instances[feature_name] = feature_instance
+            existing_features = list(self.feature_instances.keys())
+            existing_features.append(feature_name)
+            num_features = len(existing_features)
+            new_grid_layout = self.determine_grid_layout(num_features)
+            self.display_features(existing_features, new_grid_layout)
+            self.update_subtoolbar()
 
-                        card = FeatureCard(feature_instance, feature_name, self, card_width, card_height)
-                        item.widget().deleteLater()
-                        self.card_layout.addWidget(card, row, col)
-                        logging.info(f"Added feature {feature_name} to grid at position ({row}, {col})")
-                        return
-            QMessageBox.warning(self, "Error", "No empty space in the grid to add the feature!")
+            logging.info(f"Added feature {feature_name}, new grid layout: {new_grid_layout}")
         except Exception as e:
             logging.error(f"Error adding feature to grid: {str(e)}")
             QMessageBox.warning(self, "Error", f"Error adding feature to grid: {str(e)}")
 
     def open_project(self):
-        """Open an existing project."""
         try:
             if not self.db.is_connected():
                 self.db.reconnect()
             projects = self.db.load_projects()
+
             if not projects:
                 QMessageBox.warning(self, "Error", "No projects available to open!")
                 return
+
             project_name, ok = QInputDialog.getItem(self, "Open Project", "Select project:", projects, 0, False)
+
             if ok and project_name:
                 if project_name in self.project_selection_window.open_dashboards:
                     self.project_selection_window.open_dashboards[project_name].raise_()
                     self.project_selection_window.open_dashboards[project_name].activateWindow()
                     return
+
                 dashboard = DashboardWindow(self.db, self.email, project_name, self.project_selection_window)
                 dashboard.show()
                 self.project_selection_window.open_dashboards[project_name] = dashboard
@@ -1181,13 +1364,15 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Error opening project: {str(e)}")
 
     def create_project(self):
-        """Create a new project."""
         project_name, ok = QInputDialog.getText(self, "Create Project", "Enter project name:")
+
         if ok and project_name:
             try:
                 if not self.db.is_connected():
                     self.db.reconnect()
+
                 success, message = self.db.create_project(project_name)
+
                 if success:
                     dashboard = DashboardWindow(self.db, self.email, project_name, self.project_selection_window)
                     dashboard.show()
@@ -1203,29 +1388,32 @@ class DashboardWindow(QWidget):
                 QMessageBox.warning(self, "Error", f"Error creating project: {str(e)}")
 
     def edit_project_dialog(self):
-        """Edit the current project's name."""
         old_project_name = self.current_project
         new_project_name, ok = QInputDialog.getText(self, "Edit Project", "Enter new project name:", text=old_project_name)
+
         if not ok or not new_project_name or new_project_name == old_project_name:
             return
 
         try:
             if not self.db.is_connected():
                 self.db.reconnect()
+
             success, message = self.db.edit_project(old_project_name, new_project_name)
+
             if success:
                 self.current_project = new_project_name
-                self.setWindowTitle(f'Sarayu Desktop Application - {self.current_project}')
+                self.setWindowTitle(f'Sarayu Desktop Application - {self.current_project.upper()}')
                 self.load_project_features()
                 self.setup_mqtt()
                 self.update_toolbar()
                 self.update_subtoolbar()
-                if self.current_feature:
-                    self.display_feature_content(self.current_feature, self.current_project)
-                else:
-                    self.display_feature_content("Create Tags", self.current_project)
+
+                existing_features = list(self.feature_instances.keys())
+                self.display_features(existing_features, self.current_grid_layout)
+
                 if old_project_name in self.project_selection_window.open_dashboards:
                     self.project_selection_window.open_dashboards[new_project_name] = self.project_selection_window.open_dashboards.pop(old_project_name)
+
                 self.project_selection_window.load_projects()
                 QMessageBox.information(self, "Success", message)
                 self.update_file_bar()
@@ -1236,17 +1424,20 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Error editing project: {str(e)}")
 
     def delete_project(self):
-        """Delete the current project."""
         reply = QMessageBox.question(self, "Confirm Delete", f"Are you sure you want to delete {self.current_project}?",
-                                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                                     QMessageBox.Yes | QDialogButtonBox.No, QMessageBox.No)
+
         if reply == QMessageBox.Yes:
             try:
                 if not self.db.is_connected():
                     self.db.reconnect()
+
                 success, message = self.db.delete_project(self.current_project)
+
                 if success:
                     if self.current_project in self.project_selection_window.open_dashboards:
                         del self.project_selection_window.open_dashboards[self.current_project]
+
                     self.project_selection_window.load_projects()
                     self.close()
                     QMessageBox.information(self, "Success", message)
@@ -1257,14 +1448,16 @@ class DashboardWindow(QWidget):
                 QMessageBox.warning(self, "Error", f"Error deleting project: {str(e)}")
 
     def start_saving(self):
-        """Start saving data in Time View."""
-        if self.current_feature != "Time View":
-            QMessageBox.warning(self, "Error", "Saving is only available in Time View!")
+        if "Time View" not in self.feature_instances:
+            QMessageBox.warning(self, "Error", "Time View feature is not active in the grid!")
             return
+
         feature_instance = self.feature_instances.get("Time View")
+
         if not feature_instance:
             QMessageBox.warning(self, "Error", "Time View feature not initialized!")
             return
+
         try:
             feature_instance.start_saving()
             self.is_saving = True
@@ -1276,14 +1469,16 @@ class DashboardWindow(QWidget):
             QMessageBox.warning(self, "Error", f"Failed to start saving: {str(e)}")
 
     def stop_saving(self):
-        """Stop saving data in Time View."""
-        if self.current_feature != "Time View":
-            QMessageBox.warning(self, "Error", "Saving is only available in Time View!")
+        if "Time View" not in self.feature_instances:
+            QMessageBox.warning(self, "Error", "Time View feature is not active in the grid!")
             return
+
         feature_instance = self.feature_instances.get("Time View")
+
         if not feature_instance:
             QMessageBox.warning(self, "Error", "Time View feature not initialized!")
             return
+
         try:
             feature_instance.stop_saving()
             self.is_saving = False
@@ -1294,111 +1489,15 @@ class DashboardWindow(QWidget):
             logging.error(f"Failed to stop saving: {str(e)}")
             QMessageBox.warning(self, "Error", f"Failed to stop saving: {str(e)}")
 
-    def display_feature_content(self, feature_name, project_name):
-        """Display the content for a selected feature within the main window."""
-        def render_feature():
-            try:
-                self.current_project = project_name
-                self.current_feature = feature_name
-                self.is_saving = False
-                self.update_subtoolbar()
-
-                current_console_height = self.console.height()
-                self.clear_content_layout()
-
-                feature_classes = {
-                    "Create Tags": CreateTagsFeature,
-                    "Tabular View": TabularViewFeature,
-                    "Time View": TimeViewFeature,
-                    "Time Report": TimeReportFeature,
-                    "FFT": FFTViewFeature,
-                    "Waterfall": WaterfallFeature,
-                    "Orbit": OrbitFeature,
-                    "Trend View": TrendViewFeature,
-                    "Multiple Trend View": MultiTrendFeature,
-                    "Bode Plot": BodePlotFeature,
-                    "History Plot": HistoryPlotFeature,
-                    "Report": ReportFeature
-                }
-
-                if feature_name not in feature_classes:
-                    logging.error(f"Unknown feature: {feature_name}")
-                    QMessageBox.warning(self, "Error", f"Unknown feature: {feature_name}")
-                    return
-
-                feature_instance = self.feature_instances.get(feature_name)
-                if not feature_instance or getattr(feature_instance, 'project_name', None) != project_name:
-                    if not self.db.is_connected():
-                        self.db.reconnect()
-                    feature_instance = feature_classes[feature_name](self, self.db, project_name)
-                    self.feature_instances[feature_name] = feature_instance
-
-                widget = feature_instance.get_widget()
-                if widget:
-                    if feature_name in ["FFT", "Waterfall"]:
-                        widget.setFixedSize(400, 400)
-                        widget.move(50, 50)
-                        widget.setParent(self.content_container)
-                        widget.show()
-                    else:
-                        self.content_layout.addWidget(widget)
-                        widget.show()
-                else:
-                    logging.error(f"Feature {feature_name} returned invalid widget")
-                    QMessageBox.warning(self, "Error", f"Feature {feature_name} failed to initialize")
-
-                self.console.setFixedHeight(current_console_height)
-            except Exception as e:
-                logging.error(f"Error displaying feature content: {str(e)}")
-                QMessageBox.warning(self, "Error", f"Error displaying feature: {str(e)}")
-
-        QTimer.singleShot(50, render_feature)
-
-    def save_action(self):
-        """Save the current project's data."""
-        if self.current_project:
-            try:
-                if not self.db.is_connected():
-                    self.db.reconnect()
-                project_data = self.db.get_project_data(self.current_project)
-                if project_data:
-                    QMessageBox.information(self, "Save", f"Data for project '{self.current_project}' saved successfully!")
-                else:
-                    QMessageBox.warning(self, "Save Error", "No data to save for the selected project!")
-                self.update_file_bar()
-            except Exception as e:
-                logging.error(f"Error saving project: {str(e)}")
-                QMessageBox.warning(self, "Error", f"Error saving project: {str(e)}")
-        else:
-            QMessageBox.warning(self, "Save Error", "No project selected to save!")
-
-    def refresh_action(self):
-        """Refresh the current view."""
-        try:
-            if self.current_project and self.current_feature:
-                self.display_feature_content(self.current_feature, self.current_project)
-                QMessageBox.information(self, "Refresh", f"Refreshed view for '{self.current_feature}'!")
-            else:
-                self.display_feature_content("Create Tags", self.current_project)
-                QMessageBox.information(self, "Refresh", "Refreshed default view!")
-            self.update_file_bar()
-        except Exception as e:
-            logging.error(f"Error refreshing view: {str(e)}")
-            QMessageBox.warning(self, "Error", f"Error refreshing view: {str(e)}")
-
     def display_dashboard(self):
-        """Display the default view for the project."""
         self.current_feature = None
         self.is_saving = False
         self.timer.stop()
-        self.current_grid_layout = None
-        self.card_layout = None
-        self.grid_label.setText("None")
-        self.display_feature_content("Create Tags", self.current_project)
+        self.feature_instances.clear()
+        self.display_features(["Create Tags"], "1x1")
         self.update_file_bar()
 
     def clear_content_layout(self):
-        """Clear the content layout without affecting the console."""
         try:
             while self.content_layout.count():
                 item = self.content_layout.takeAt(0)
@@ -1414,10 +1513,7 @@ class DashboardWindow(QWidget):
                     child.setParent(None)
                     child.deleteLater()
 
-            self.card_layout = None
-
-            for feature_name in list(self.feature_instances.keys()):
-                instance = self.feature_instances[feature_name]
+            for feature_name, instance in list(self.feature_instances.items()):
                 try:
                     if hasattr(instance, 'cleanup'):
                         instance.cleanup()
@@ -1431,27 +1527,42 @@ class DashboardWindow(QWidget):
                 finally:
                     del self.feature_instances[feature_name]
 
+            self.grid_layout = None
+            self.scroll_area = None
+            self.content_container.update()
             gc.collect()
+
             logging.info("Content layout cleared")
         except Exception as e:
             logging.error(f"Error clearing content layout: {str(e)}")
 
     def settings_action(self):
-        """Display settings (not implemented)."""
         QMessageBox.information(self, "Settings", "Settings functionality not implemented yet.")
         self.update_file_bar()
 
+    def refresh_action(self):
+        try:
+            existing_features = list(self.feature_instances.keys())
+            self.display_features(existing_features, self.current_grid_layout)
+            QMessageBox.information(self, "Refresh", "Refreshed current view!")
+            self.update_file_bar()
+        except Exception as e:
+            logging.error(f"Error refreshing view: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Error refreshing view: {str(e)}")
+
     def closeEvent(self, event):
-        """Handle window close event."""
         try:
             if self.timer.isActive():
                 self.timer.stop()
             self.cleanup_mqtt()
             self.clear_content_layout()
+
             if self.db and self.db.is_connected():
                 self.db.close_connection()
+
             if self.current_project in self.project_selection_window.open_dashboards:
                 del self.project_selection_window.open_dashboards[self.current_project]
+
             app = QApplication.instance()
             if app:
                 app.quit()
