@@ -38,7 +38,7 @@ class DashboardWindow(QWidget):
         self.is_saving = False
         self.mqtt_connected = False
         self.fft_window = None  # Kept for compatibility, not used
-        self.current_layout = (1, 3)  # Default layout: 1x3 (rows, cols)
+        self.current_layout = (2, 2)  # Default layout: 2x2 (rows, cols)
 
         # Initialize UI first
         self.initUI()
@@ -364,8 +364,8 @@ class DashboardWindow(QWidget):
         # MDI area
         self.mdi_area = QMdiArea()
         self.mdi_area.setStyleSheet("QMdiArea { background-color: #263238; border: none; }")
-        self.mdi_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.mdi_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # self.mdi_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # self.mdi_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         right_layout.addWidget(self.mdi_area, 1)
 
         main_splitter.addWidget(right_container)
@@ -385,7 +385,7 @@ class DashboardWindow(QWidget):
         button_layout.setSpacing(5)
         self.button_container.setLayout(button_layout)
 
-        # Spacer to push buttons to the right
+        # Spacer to push buttons to the right for layout icon
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         button_layout.addWidget(spacer)
@@ -459,7 +459,7 @@ class DashboardWindow(QWidget):
             }
         """)
 
-        # Console header layout for MQTT status (full width, red background)
+        # Console header layout for MQTT status (full width, black background)
         self.console_header_container = QWidget()
         console_header_layout = QHBoxLayout()
         console_header_layout.setContentsMargins(0, 0, 0, 0)
@@ -530,7 +530,7 @@ class DashboardWindow(QWidget):
             self.console_layout.addWidget(self.console_message_area)
             self.console_layout.addWidget(self.console_header_container)
 
-            logging.info("Console maximized to 150px")
+            logging.info("Console maximized to 100px")
         except Exception as e:
             logging.error(f"Error maximizing console: {str(e)}")
 
@@ -730,7 +730,7 @@ class DashboardWindow(QWidget):
                 return
 
             if prompt_for_layout:
-                layout_options = ["1x2", "1x3", "2x2", "3x3"]
+                layout_options = ["1x2", "2x2", "3x3"]
                 layout_choice, ok = QInputDialog.getItem(self, "Select Layout",
                                                         "Choose a layout:",
                                                         layout_options, layout_options.index(f"{self.current_layout[0]}x{self.current_layout[1]}"), False)
@@ -744,66 +744,104 @@ class DashboardWindow(QWidget):
 
             GAP = 10
             num_windows = len(sub_windows)
-            windows_per_grid = rows * cols
-            num_grids = (num_windows + windows_per_grid - 1) // windows_per_grid  # Number of grids needed
 
             # Get MDI area dimensions
             mdi_rect = self.mdi_area.viewport().rect()
             mdi_width = mdi_rect.width()
             mdi_height = mdi_rect.height()
 
-            # Calculate gaps for a single grid
-            horizontal_gaps_per_grid = (cols - 1) * GAP if cols > 1 else 0
-            vertical_gaps_per_grid = (rows - 1) * GAP if rows > 1 else 0
+            if rows == 1 and cols == 2:
+                # Special handling for 1x2 layout
+                windows_per_grid = 2  # Each grid holds 2 windows side by side
+                num_grids = (num_windows + 1) // 2  # Number of vertical stacks
+                total_vertical_gaps = (num_grids - 1) * GAP if num_grids > 1 else 0
+                window_width = max(700, (mdi_width) // 2)
+                # Use half the viewport height per window to fit one pair visibly
+                window_height = max(700, (mdi_height) // 2)
 
-            # Calculate total gaps across all grids
-            total_horizontal_gaps = horizontal_gaps_per_grid * num_grids
-            total_vertical_gaps = (num_grids - 1) * GAP if num_grids > 1 else 0  # Gaps between grids
-            total_vertical_gaps += vertical_gaps_per_grid * num_grids  # Gaps within grids
+                # Calculate total content height for scrolling
+                total_content_height = num_grids * (window_height + GAP) + total_vertical_gaps
 
-            # Calculate available space for windows
-            available_width = mdi_width - horizontal_gaps_per_grid
-            available_height = (mdi_height - total_vertical_gaps) // max(1, num_grids)
+                for i, sub_window in enumerate(sub_windows):
+                    try:
+                        grid_index = i // windows_per_grid  # Which vertical stack
+                        col_in_grid = i % 2  # Left or right column
 
-            # Base window size for each cell in the grid
-            base_window_width = max(300, available_width // cols)
-            base_window_height = max(200, available_height // rows)
+                        # Calculate position
+                        x = col_in_grid * (window_width )
+                        y = grid_index * (window_height)
 
-            for i, sub_window in enumerate(sub_windows):
-                try:
-                    # Determine which grid this window belongs to
-                    grid_index = i // windows_per_grid  # Which grid (stacked vertically)
-                    index_in_grid = i % windows_per_grid  # Position within the grid
-                    row_in_grid = index_in_grid // cols
-                    col_in_grid = index_in_grid % cols
+                        sub_window.setGeometry(x, y, window_width, window_height)
+                        sub_window.showNormal()
+                        sub_window.raise_()
+                    except Exception as e:
+                        logging.error(f"Error arranging sub-window {i}: {str(e)}")
+                        self.append_to_console(f"Error arranging sub-window {i}: {str(e)}")
 
-                    # Calculate position
-                    x = col_in_grid * (base_window_width + GAP)
-                    y = (grid_index * (rows * base_window_height + vertical_gaps_per_grid + GAP)) + (row_in_grid * (base_window_height + GAP))
+                # Keep MDI area height fixed, enable scrolling
+                self.mdi_area.setMinimumHeight(mdi_height)
+                self.mdi_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+                self.mdi_area.setMinimumSize(0, 0)  # Prevent forced stretching
+                self.mdi_area.viewport().update()
 
-                    # Adjust window size to fill remaining space
-                    window_width = base_window_width
-                    window_height = base_window_height
+            else:
+                # Logic for other layouts (2x2, 1x3, 3x3)
+                windows_per_grid = rows * cols
+                num_grids = (num_windows + windows_per_grid - 1) // windows_per_grid
+                horizontal_gaps_per_grid = (cols - 1) * GAP if cols > 1 else 0
+                vertical_gaps_per_grid = (rows - 1) * GAP if rows > 1 else 0
+                total_horizontal_gaps = horizontal_gaps_per_grid
+                total_vertical_gaps = (num_grids - 1) * GAP if num_grids > 1 else 0
+                total_vertical_gaps += vertical_gaps_per_grid * num_grids
 
-                    # Stretch the last window in each row to fill remaining width
-                    if col_in_grid == cols - 1:
-                        remaining_width = mdi_width - x - (cols - 1) * GAP
-                        window_width = max(300, remaining_width)
+                available_width = mdi_width - total_horizontal_gaps
+                base_window_width = max(300, available_width // max(1, cols))
+                base_window_height = max(200, (mdi_height - vertical_gaps_per_grid) // max(1, rows))
 
-                    # Stretch the last window in each grid row to fill remaining height
-                    if row_in_grid == rows - 1:
-                        grid_top = grid_index * (rows * base_window_height + vertical_gaps_per_grid + GAP)
-                        grid_height = (rows * base_window_height + (rows - 1) * GAP)
-                        remaining_height = (mdi_height // max(1, num_grids)) - grid_height
-                        window_height = max(200, base_window_height + remaining_height // rows)
+                for i, sub_window in enumerate(sub_windows):
+                    try:
+                        grid_index = i // windows_per_grid
+                        index_in_grid = i % windows_per_grid
+                        row_in_grid = index_in_grid // cols
+                        col_in_grid = index_in_grid % cols
 
-                    sub_window.setGeometry(x, y, window_width, window_height)
-                    sub_window.showNormal()
-                    sub_window.raise_()
-                except Exception as e:
-                    logging.error(f"Error arranging sub-window {i}: {str(e)}")
-                    self.append_to_console(f"Error arranging sub-window {i}: {str(e)}")
+                        x = col_in_grid * (base_window_width + GAP)
+                        y = (grid_index * (rows * base_window_height + vertical_gaps_per_grid + GAP)) + (row_in_grid * (base_window_height + GAP))
+                        
 
+                        window_width = base_window_width
+                        window_height = base_window_height
+
+                        if col_in_grid == cols - 1:
+                            remaining_width = mdi_width - x - (cols - 1) * GAP
+                            window_width = max(300, remaining_width)
+
+                        if row_in_grid == rows - 1:
+                            grid_top = grid_index * (rows * base_window_height + vertical_gaps_per_grid + GAP)
+                            grid_height = (rows * base_window_height + (rows - 1) * GAP)
+                            remaining_height = (mdi_height - grid_top - grid_height) // max(1, num_grids)
+                            window_height = max(200, base_window_height + remaining_height // rows)
+
+                        sub_window.setGeometry(x, y, window_width, window_height)
+                        sub_window.showNormal()
+                        sub_window.raise_()
+                    except Exception as e:
+                        logging.error(f"Error arranging sub-window {i}: {str(e)}")
+                        self.append_to_console(f"Error arranging sub-window {i}: {str(e)}")
+
+                total_height = num_grids * (rows * base_window_height + vertical_gaps_per_grid) + (num_grids - 1) * GAP
+                self.mdi_area.setMinimumHeight(min(total_height, mdi_height))
+
+            layout_str = f"{rows}x{cols}"
+            logging.info(f"Arranged {num_windows} sub-windows in {layout_str} grid layout ({num_grids} grids) with 10px gaps")
+            self.append_to_console(f"Arranged {num_windows} sub-windows in {layout_str} grid layout ({num_grids} grids) with 10px gaps")
+        except Exception as e:
+            logging.error(f"Error arranging layout: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Error arranging layout: {str(e)}")
+            self.append_to_console(f"Error arranging layout: {str(e)}")
+            # Ensure MDI area allows scrolling
+            total_height = num_grids * (rows * base_window_height + vertical_gaps_per_grid) + (num_grids - 1) * GAP
+            self.mdi_area.setMinimumHeight(min(total_height, mdi_height))
             self.mdi_area.updateGeometry()
             self.mdi_area.viewport().update()
 
